@@ -10,7 +10,7 @@
  * Spoken French (later) gets its own bus that is never cut or ducked.
  */
 
-const MIX = { master: 0.72, music: 0.5, effects: 0.6, voice: 1, speakerCut: 110, duckTo: 0.25, duckSeconds: 0.15 } as const;
+const MIX = { master: 0.72, music: 0.5, effects: 0.6, city: 0.55, voice: 1, speakerCut: 110, duckTo: 0.25, duckSeconds: 0.15 } as const;
 
 const MUTE_KEY = 'suspect.music';
 
@@ -19,6 +19,8 @@ export class Mixer {
   private master!: GainNode;
   music!: GainNode;
   effects!: GainNode;
+  /** The street: traffic, crowds, horns, birds, footsteps. */
+  city!: GainNode;
   voice!: GainNode;
   musicMuted = readMuted();
 
@@ -53,6 +55,9 @@ export class Mixer {
       this.effects = ctx.createGain();
       this.effects.gain.value = MIX.effects;
       this.effects.connect(cut1);
+      this.city = ctx.createGain();
+      this.city.gain.value = MIX.city;
+      this.city.connect(cut1);
       this.voice = ctx.createGain();
       this.voice.gain.value = MIX.voice;
       this.voice.connect(this.master);

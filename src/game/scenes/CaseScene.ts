@@ -1,18 +1,21 @@
 import Phaser from 'phaser';
-import { buildCentreVille } from '../../content/centreVille';
+import { buildCentreVille, STREET_LINES } from '../../content/centreVille';
 import { CHAPTER_1, planCase, type PlannedCase, type PlannedClue } from '../../engine/cases';
 import { phraseFr, sentenceEn, type Subject } from '../../engine/clues';
 import { LEVELS, TWISTS, type Level } from '../../engine/difficulty';
 import { points, stars, type CaseResult } from '../../engine/scoring';
 import { centreX, centreY, spotAt, type Spot, type Street } from '../../engine/street';
+import { CitySound } from '../audio/city';
 import { mixer } from '../audio/mixer';
 import { music } from '../audio/music';
 import { sounds } from '../audio/sounds';
+import { Figure } from '../figure';
+import { Recruit } from '../recruit';
 import { getLevel, saveResult } from '../store';
 import { DEPTH, StreetView } from '../streetView';
 import { button, COLOURS, fullscreenButton, GAME_HEIGHT, GAME_WIDTH, goTo, text } from '../ui';
 
-type Phase = 'intro' | 'radio' | 'search' | 'found' | 'escaped' | 'report';
+type Phase = 'intro' | 'runaway' | 'radio' | 'search' | 'found' | 'escaped' | 'report';
 
 /** How the scene scrolls and feels. Tunable here, not inline. */
 const FEEL = {
@@ -24,6 +27,8 @@ const FEEL = {
   crouchHeight: 56,
   benchCrouchHeight: 42,
   minimap: { x: 14, y: 676, w: 380 },
+  recruitScreenX: 470,
+  runaway: { fromScreenX: 430, speed: 560, seconds: 2.1 },
 } as const;
 
 /** Zoomed in on a catch, keep the suspect in view: roofs near the top, tree and bench near the bottom. */
@@ -79,6 +84,10 @@ export class CaseScene extends Phaser.Scene {
   private keys!: Record<'left' | 'right' | 'a' | 'd', Phaser.Input.Keyboard.Key>;
   private edgeHeld = 0;
   private drag: { x: number; scroll: number; moved: boolean } | null = null;
+  private recruit!: Recruit;
+  private recruitTarget: number | null = null;
+  private city!: CitySound;
+  private runner: { figure: Figure; speed: number } | null = null;
 
   constructor() {
     super(CaseScene.KEY);
@@ -107,6 +116,15 @@ export class CaseScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(0, 0, this.street.width, GAME_HEIGHT);
     cam.scrollX = 0;
+
+    this.recruit = new Recruit(this, FEEL.recruitScreenX, DEPTH.nearWalkers + 1);
+    this.recruitTarget = null;
+    this.runner = null;
+    this.city = new CitySound();
+    const startCity = () => void this.city.start((key) => this.cache.binary.get(key) as ArrayBuffer | undefined, this.view.cars);
+    if (mixer.ctx?.state === 'running') startCity();
+    else this.input.once('pointerdown', startCity);
+    this.events.once('shutdown', () => this.city.stop());
 
     this.hover = this.add.graphics().setDepth(DEPTH.effects);
     this.buildHud();
@@ -290,17 +308,37 @@ export class CaseScene extends Phaser.Scene {
     const go = button(this, GAME_WIDTH / 2 + 150, 520, 240, 64, 'START', () => {
       layer.destroy();
       go.container.destroy();
-      this.startRadio();
+      this.runAway();
     }, COLOURS.red, '#ffffff');
     go.container.setScrollFactor(0).setDepth(DEPTH.hud + 11);
     this.input.keyboard?.once('keydown-ENTER', () => {
       if (this.phase === 'intro' && go.container.active) {
         layer.destroy();
         go.container.destroy();
-        this.startRadio();
+        this.runAway();
       }
     });
     music.play('title');
+  }
+
+  /** The opening: the suspect is spotted and runs off to hide; the recruit gives chase. */
+  private runAway(): void {
+    this.phase = 'runaway';
+    music.play('search');
+    const boss = this.plan.def.boss === 'pie';
+    const r = FEEL.runaway;
+    const x = this.cameras.main.scrollX + r.fromScreenX;
+    const figure = new Figure(this, boss ? 'pie_walk' : 'suspect_1', x, STREET_LINES.base + 30, FEEL.suspectHeight).setDepth(DEPTH.suspectFar);
+    this.runner = { figure, speed: r.speed };
+    this.time.delayedCall(350, () => (this.recruitTarget = this.cameras.main.scrollX + 900));
+    this.say(x, STREET_LINES.base - 70, boss ? 'Attrapez-moi !' : 'Hi hi ! Cherchez-moi !');
+    this.time.delayedCall(500, () => this.say(this.recruit.x, 600, 'Halte ! Police !'));
+    this.time.delayedCall(r.seconds * 1000, () => {
+      this.runner?.figure.destroy();
+      this.runner = null;
+      this.recruitTarget = null;
+      this.startRadio();
+    });
   }
 
   private startRadio(): void {
@@ -466,6 +504,7 @@ export class CaseScene extends Phaser.Scene {
     this.input.setDefaultCursor('default');
     music.play('off');
     const spot = this.current.target;
+    this.recruitTarget = spot.footX + (spot.footX > this.recruit.x ? -80 : 80);
     const who = this.suspectSprite(spot);
     const finalScale = who.scale;
     who.setScale(0);
@@ -504,10 +543,10 @@ export class CaseScene extends Phaser.Scene {
     cam.pan(centreX(spot), panY(spot), 700, 'Sine.easeInOut');
     this.time.delayedCall(750, () => {
       const boss = this.plan.def.boss === 'pie';
-      const runner = this.add.image(spot.footX, spot.footY, boss ? 'pie_run' : 'suspect_1').setOrigin(0.5, 1).setDepth(DEPTH.effects);
-      runner.setScale(FEEL.suspectHeight / runner.height);
+      const runner = new Figure(this, boss ? 'pie_walk' : 'suspect_1', spot.footX, spot.footY, FEEL.suspectHeight).setDepth(DEPTH.effects);
+      this.runner = { figure: runner, speed: 520 };
       this.say(spot.footX, spot.footY - 90, boss ? 'Au revoir !' : 'Hi hi !');
-      this.tweens.add({ targets: runner, x: spot.footX + 700, duration: 1500, ease: 'Quad.in' });
+      this.recruitTarget = spot.footX + 600;
       sounds.escape();
       const t = text(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, 'Oh non ! Il s’échappe !', 64, '#ffffff', { stroke: COLOURS.navyText, strokeThickness: 10 })
         .setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.hud + 20);
@@ -609,6 +648,11 @@ export class CaseScene extends Phaser.Scene {
     this.view.update(time, delta);
     const cam = this.cameras.main;
     const dt = Math.min(delta, 100) / 1000;
+    if (this.runner) this.runner.figure.move(this.runner.speed * dt);
+    // The recruit keeps up with the view, or runs to the suspect at the end.
+    this.recruit.update(this.recruitTarget ?? cam.scrollX + FEEL.recruitScreenX, dt);
+    this.city.footsteps(this.recruit.running, dt);
+    this.city.update(cam.midPoint.x);
     if (this.phase === 'search' || this.phase === 'radio') {
       let dir = this.edgeHeld;
       if (this.keys) {

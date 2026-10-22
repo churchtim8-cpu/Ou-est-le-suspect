@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { TILES } from '../../content/centreVille';
+import { CITY_FILES } from '../audio/city';
+import { WALK_FRAMES, WALKERS } from '../figure';
 import { COLOURS, GAME_HEIGHT, GAME_WIDTH, text } from '../ui';
 
-/** Loads every picture (all WebP, about 1.2 MB for the sample) behind a progress bar. */
+/** Loads every picture (all WebP, about 1.8 MB for the sample, with the street sounds) behind a progress bar. */
 export class BootScene extends Phaser.Scene {
   static readonly KEY = 'boot';
 
@@ -25,6 +27,11 @@ export class BootScene extends Phaser.Scene {
     img('tree', 'sprites/tree');
     img('bench', 'sprites/bench');
     for (const n of ['walk', 'run', 'stand', 'ring']) img(`pie_${n}`, `sprites/pie_${n}`);
+    // Walk cycles (scripts/art/legs.py) and the recruit's run.
+    for (const key of WALKERS) for (let i = 0; i < WALK_FRAMES; i++) img(`${key}_${i}`, `walk/${key}_${i}`);
+    for (let i = 0; i < 4; i++) img(`recruit_run_${i}`, `sprites/recruit_run_${i}`);
+    img('recruit_stand', 'sprites/recruit_stand');
+    for (const [key, path] of Object.entries(CITY_FILES)) this.load.binary(key, path);
     for (const n of ['sergeant_bust', 'recruit_girl_bust', 'recruit_boy_bust', 'badge', 'radio', 'suspect-pie']) img(n, `cast/${n}`);
   }
 

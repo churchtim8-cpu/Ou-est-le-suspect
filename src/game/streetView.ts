@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PROPS_LAYOUT, STREET_LINES, TILES } from '../content/centreVille';
+import { Figure, type WalkerKey } from './figure';
 import { lightGraphics } from './graphics';
 
 /**
@@ -24,18 +25,22 @@ export const DEPTH = {
 /** Picture keys for the street things. */
 export const PROP_PICTURE = { tree: 'tree', bench: 'bench', red_car: 'car_0', blue_car: 'car_1' } as const;
 
-interface Mover {
+interface Car {
   sprite: Phaser.GameObjects.Image;
   speed: number;
   baseY: number;
-  phase: number;
-  bob: number;
-  wheels?: boolean;
+  kind: 'car' | 'bus';
+}
+
+interface Walker {
+  figure: Figure;
+  speed: number;
 }
 
 export class StreetView {
   readonly width: number;
-  private movers: Mover[] = [];
+  readonly cars: Car[] = [];
+  private walkers: Walker[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -59,19 +64,16 @@ export class StreetView {
     // People on the far pavement (smaller: further away) and the near pavement.
     const far = Math.round(14 * keep);
     for (let i = 0; i < far; i++) {
-      const dir = rnd.pick([-1, 1]);
-      const s = this.scene.add.image(rnd.between(0, this.width), STREET_LINES.base + 26, `walk_${i % 8}`).setOrigin(0.5, 1).setDepth(DEPTH.farWalkers);
-      s.setScale(74 / s.height).setFlipX(dir < 0);
-      this.movers.push({ sprite: s, speed: dir * rnd.realInRange(28, 44), baseY: s.y, phase: rnd.realInRange(0, 6), bob: 2.2 });
+      const f = new Figure(this.scene, `walk_${i % 8}` as WalkerKey, rnd.between(0, this.width), STREET_LINES.base + 26, 74, rnd.frac()).setDepth(DEPTH.farWalkers);
+      this.walkers.push({ figure: f.face(rnd.pick([-1, 1])), speed: rnd.realInRange(28, 44) });
     }
     const near = Math.round(6 * keep);
     for (let i = 0; i < near; i++) {
-      const dir = rnd.pick([-1, 1]);
-      const s = this.scene.add.image(rnd.between(0, this.width), 716, `walk_${(i + 3) % 8}`).setOrigin(0.5, 1).setDepth(DEPTH.nearWalkers);
-      s.setScale(96 / s.height).setFlipX(dir < 0).setAlpha(0.97);
-      this.movers.push({ sprite: s, speed: dir * rnd.realInRange(36, 52), baseY: s.y, phase: rnd.realInRange(0, 6), bob: 2.8 });
+      const f = new Figure(this.scene, `walk_${(i + 3) % 8}` as WalkerKey, rnd.between(0, this.width), 716, 96, rnd.frac()).setDepth(DEPTH.nearWalkers);
+      this.walkers.push({ figure: f.face(rnd.pick([-1, 1])), speed: rnd.realInRange(36, 52) });
     }
     // One-way traffic on the far lane: cars about the police car's size, the bus bigger.
+    // Every Canva vehicle faces left, so the lane runs right to left (never backwards).
     // Never red or blue: "la voiture rouge" and "la voiture bleue" must stay the parked ones.
     const cars: [string, number][] = [['car_2', 86], ['car_4', 84], ['car_3', 90], ['car_5', 124]];
     const count = Math.max(2, Math.round(cars.length * keep));
@@ -79,19 +81,25 @@ export class StreetView {
       const [key, h] = cars[i]!;
       const s = this.scene.add.image((i * this.width) / count, STREET_LINES.trafficY, key).setOrigin(0.5, 1).setDepth(DEPTH.traffic);
       s.setScale(h / s.height);
-      this.movers.push({ sprite: s, speed: key === 'car_5' ? 120 : rnd.realInRange(150, 190), baseY: s.y, phase: 0, bob: 0.6, wheels: true });
+      const bus = key === 'car_5';
+      this.cars.push({ sprite: s, speed: -(bus ? 120 : rnd.realInRange(150, 190)), baseY: s.y, kind: bus ? 'bus' : 'car' });
     }
   }
 
-  update(time: number, delta: number): void {
+  update(_time: number, delta: number): void {
     const dt = Math.min(delta, 100) / 1000;
-    for (const m of this.movers) {
-      const s = m.sprite;
-      s.x += m.speed * dt;
+    for (const w of this.walkers) {
+      const f = w.figure;
+      f.move(w.speed * f.facing * dt);
+      const half = f.width / 2;
+      if (f.x - half > this.width) f.x = -half;
+      if (f.x + half < 0) f.x = this.width + half;
+    }
+    for (const c of this.cars) {
+      const s = c.sprite;
+      s.x += c.speed * dt;
       const half = s.displayWidth / 2;
-      if (m.speed > 0 && s.x - half > this.width) s.x = -half;
-      if (m.speed < 0 && s.x + half < 0) s.x = this.width + half;
-      s.y = m.baseY - Math.abs(Math.sin(time / (m.wheels ? 90 : 160) + m.phase)) * m.bob;
+      if (s.x + half < 0) s.x = this.width + half;
     }
   }
 }
