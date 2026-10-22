@@ -1,0 +1,70 @@
+{
+ "width": 6818.0,
+ "height": 720,
+ "base": 470,
+ "farPavement": [
+  470,
+  505
+ ],
+ "road": [
+  505,
+  612
+ ],
+ "nearPavement": [
+  612,
+  720
+ ],
+ "buildings": [
+  {
+   "place": "police_station",
+   "x0": 214.0,
+   "x1": 782.0,
+   "roof": 140.7
+  },
+  {
+   "place": "post_office",
+   "x0": 990.7,
+   "x1": 1504.0,
+   "roof": 127.3
+  },
+  {
+   "place": "town_hall",
+   "x0": 1714.7,
+   "x1": 2379.3,
+   "roof": 245.3
+  },
+  {
+   "place": "square",
+   "x0": 2379.3,
+   "x1": 3248.7,
+   "roof": 172.7
+  },
+  {
+   "place": "bank",
+   "x0": 3460.0,
+   "x1": 4021.3,
+   "roof": 115.3
+  },
+  {
+   "place": "library",
+   "x0": 4237.3,
+   "x1": 4889.3,
+   "roof": 162.7
+  },
+  {
+   "place": "school",
+   "x0": 5093.3,
+   "x1": 5722.0,
+   "roof": 169.3
+  },
+  {
+   "place": "museum",
+   "x0": 5932.7,
+   "x1": 6606.7,
+   "roof": 140.0
+  }
+ ],
+ "tiles": 5,
+ "tileWidth": 1365.3333333333333,
+ "textureScale": 1.5
+}
