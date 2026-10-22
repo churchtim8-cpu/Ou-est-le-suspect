@@ -20,7 +20,7 @@
   "bugs": {
     "url": "https://github.com/churchtim8-cpu/ou-est-le-suspect/issues"
   },
-  "homepage": "https://churchtim8-cpu.github.io/ou-est-le-suspect/",
+  "homepage": "https://churchtim8-cpu.github.io/Ou-est-le-suspect/",
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.3",
