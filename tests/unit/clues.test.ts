@@ -64,42 +64,62 @@ describe('centre-ville street', () => {
 });
 
 describe('chapter 1 cases', () => {
-  const seeds = Array.from({ length: 200 }, (_, i) => `seed-${i}`);
+  const seeds = Array.from({ length: 150 }, (_, i) => `seed-${i}`);
+  const plans = (def: (typeof CHAPTER_1)[number]) => [3, 5].flatMap((n) => seeds.map((seed) => planCase(def, street, seed, n)));
 
   it.each(CHAPTER_1.map((c) => [c.id, c] as const))('%s: every planned clue is true and unambiguous', (_, def) => {
-    for (const seed of seeds) {
-      const plan = planCase(def, street, seed);
-      for (const step of [plan.first, plan.move]) {
-        if (!step) continue;
-        expect(isUnambiguous(step.clue, step.target, street)).toBe(true);
-        expect(def.preps).toContain(step.clue.prep);
+    for (const plan of plans(def))
+      for (const s of plan.suspects)
+        for (const step of [s.first, s.move]) {
+          if (!step) continue;
+          expect(isUnambiguous(step.clue, step.target, street)).toBe(true);
+          expect(MODELLED).toContain(step.clue.prep);
+        }
+  });
+
+  it.each(CHAPTER_1.map((c) => [c.id, c] as const))('%s: a gang of 3 or 5, each in a different place, spread along the street', (_, def) => {
+    for (const plan of plans(def)) {
+      const firsts = plan.suspects.map((s) => s.first.target);
+      expect([3, 5]).toContain(firsts.length);
+      expect(new Set(firsts.map((t) => t.id)).size).toBe(firsts.length);
+      const xs = firsts.map((t) => t.footX);
+      expect(Math.max(...xs) - Math.min(...xs), def.id).toBeGreaterThan(1500);
+      const boss = plan.suspects.at(-1)!;
+      if (def.boss) {
+        expect(boss.boss).toBe(true);
+        expect(firsts).not.toContain(boss.move!.target);
       }
     }
   });
 
-  it('the reader, hearing only the French, always finds the one right spot', () => {
-    for (const def of CHAPTER_1)
-      for (const seed of seeds) {
-        const plan = planCase(def, street, seed);
-        const sentence = sentenceFr(plan.subject, plan.first.clue);
-        const found = spotsFromSentence(sentence, street);
-        expect(found.map((s) => s.id), sentence).toEqual([plan.first.target.id]);
-        if (plan.move) {
-          const again = spotsFromSentence(sentenceFr(plan.pronoun, plan.move.clue), street);
-          expect(again.map((s) => s.id)).toEqual([plan.move.target.id]);
-        }
+  it('the new preposition comes first: review only fills a gang the new one cannot', () => {
+    for (const def of CHAPTER_1.filter((d) => !d.boss))
+      for (const plan of plans(def)) {
+        const own = plan.suspects.filter((s) => def.preps.includes(s.first.clue.prep)).length;
+        const room = new Set(street.spots.filter((sp) => cluesFor(sp, street, def.preps).length > 0).map((sp) => sp.id)).size;
+        expect(own, def.id).toBe(Math.min(plan.suspects.length, room));
       }
   });
 
-  it('replays vary the hiding spot', () => {
+  it('the reader, hearing only the French, always finds the one right spot', () => {
+    for (const def of CHAPTER_1)
+      for (const plan of plans(def))
+        for (const s of plan.suspects) {
+          const sentence = sentenceFr(s.subject, s.first.clue);
+          expect(spotsFromSentence(sentence, street).map((x) => x.id), sentence).toEqual([s.first.target.id]);
+          if (s.move) expect(spotsFromSentence(sentenceFr(s.pronoun, s.move.clue), street).map((x) => x.id)).toEqual([s.move.target.id]);
+        }
+  });
+
+  it('replays vary the hiding spots', () => {
     for (const def of CHAPTER_1) {
-      const targets = new Set(seeds.map((s) => planCase(def, street, s).first.target.id));
+      const targets = new Set(seeds.map((s) => planCase(def, street, s, 3).suspects[0]!.first.target.id));
       expect(targets.size, def.id).toBeGreaterThan(2);
     }
   });
 
   it('case 4 uses both sous and derrière', () => {
-    const preps = new Set(seeds.map((s) => planCase(CHAPTER_1[3]!, street, s).first.clue.prep));
-    expect([...preps].sort()).toEqual(['derriere', 'sous']);
+    const preps = new Set(seeds.flatMap((s) => planCase(CHAPTER_1[3]!, street, s, 3).suspects.map((x) => x.first.clue.prep)));
+    expect(preps.has('sous') && preps.has('derriere')).toBe(true);
   });
 });

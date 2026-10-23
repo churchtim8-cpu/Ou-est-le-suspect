@@ -28,6 +28,15 @@ export const SUBJECTS = {
   elle: { fr: 'Elle', en: 'She' },
 } as const satisfies Record<string, Subject>;
 
+/** "Le premier suspect", "Le deuxième suspect"…: one subject per member of the gang. */
+export const ORDINALS: readonly Subject[] = [
+  { fr: 'Le premier suspect', en: 'The first suspect' },
+  { fr: 'Le deuxième suspect', en: 'The second suspect' },
+  { fr: 'Le troisième suspect', en: 'The third suspect' },
+  { fr: 'Le quatrième suspect', en: 'The fourth suspect' },
+  { fr: 'Le cinquième suspect', en: 'The fifth suspect' },
+];
+
 /** Prepositions the street model can decide today (chapter 1). */
 export const MODELLED: readonly PrepId[] = ['devant', 'derriere', 'sur', 'sous', 'dans'];
 

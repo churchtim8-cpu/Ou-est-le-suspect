@@ -1,7 +1,9 @@
 import { SCORING } from './difficulty';
 
 export interface CaseResult {
-  caught: boolean;
+  /** Suspects caught, out of `suspects`. */
+  caught: number;
+  suspects: number;
   secondsUsed: number;
   secondsLeft: number;
   wrongTaps: number;
@@ -10,9 +12,9 @@ export interface CaseResult {
 }
 
 export function points(r: CaseResult): number {
-  if (!r.caught) return 0;
+  if (r.caught === 0) return 0;
   const raw =
-    SCORING.base +
+    r.caught * SCORING.perCatch +
     Math.round(r.secondsLeft) * SCORING.perSecondLeft -
     r.wrongTaps * SCORING.perWrongTap -
     r.englishHelps * SCORING.perEnglishHelp -
@@ -21,8 +23,8 @@ export function points(r: CaseResult): number {
 }
 
 export function stars(r: CaseResult): 0 | 1 | 2 | 3 {
-  if (!r.caught) return 0;
-  if (r.wrongTaps === 0 && r.englishHelps === 0 && r.secondsUsed <= SCORING.threeStarSeconds) return 3;
+  if (r.caught < r.suspects) return 0;
+  if (r.wrongTaps === 0 && r.englishHelps === 0) return 3;
   if (r.wrongTaps <= SCORING.twoStarWrong) return 2;
   return 1;
 }
@@ -57,7 +59,7 @@ export function record(profile: Profile, caseId: string, r: CaseResult): Profile
   };
 }
 
-/** A case opens once the one before it has been solved (at least one star). */
+/** A case opens once the one before it has been solved (the whole gang caught: at least one star). */
 export function isOpen(profile: Profile, order: readonly string[], caseId: string): boolean {
   const i = order.indexOf(caseId);
   if (i <= 0) return true;

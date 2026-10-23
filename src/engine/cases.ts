@@ -1,12 +1,14 @@
-import { cluesFor, SUBJECTS, type Clue, type Subject } from './clues';
+import { GANG } from './difficulty';
+import { cluesFor, ORDINALS, SUBJECTS, type Clue, type Subject } from './clues';
 import type { PrepId } from './prepositions';
 import { Rng } from './rng';
 import type { Spot, Street } from './street';
 
 /**
  * Chapter 1 (le centre-ville): one new preposition per case, then the boss
- * mixes them all with a twist. A case is planned from its seed, so the same
- * case replays with a different hiding spot each time.
+ * mixes them all with a twist. Each case is a gang (3 suspects on Easy, 5 on
+ * Medium) hiding all along the street, found one by one. A case is planned
+ * from its seed, so it replays with different hiding spots each time.
  */
 
 export interface CaseDef {
@@ -22,11 +24,11 @@ export interface CaseDef {
 }
 
 export const CHAPTER_1: readonly CaseDef[] = [
-  { id: 'c1-1', number: 1, title: 'Affaire n°1', blurb: 'A suspect on the street', preps: ['devant'] },
-  { id: 'c1-2', number: 2, title: 'Affaire n°2', blurb: 'Someone slipped inside', preps: ['dans'] },
+  { id: 'c1-1', number: 1, title: 'Affaire n°1', blurb: 'A gang on the street', preps: ['devant'] },
+  { id: 'c1-2', number: 2, title: 'Affaire n°2', blurb: 'They slipped inside', preps: ['dans'] },
   { id: 'c1-3', number: 3, title: 'Affaire n°3', blurb: 'Look up high', preps: ['sur'] },
   { id: 'c1-4', number: 4, title: 'Affaire n°4', blurb: 'Hiding low', preps: ['sous', 'derriere'] },
-  { id: 'c1-5', number: 5, title: 'La Pie', blurb: 'BOSS: loves high places', preps: ['devant', 'dans', 'sur', 'sous', 'derriere'], boss: 'pie' },
+  { id: 'c1-5', number: 5, title: 'La Pie', blurb: 'BOSS: La Pie and her gang', preps: ['devant', 'dans', 'sur', 'sous', 'derriere'], boss: 'pie' },
 ];
 
 export interface PlannedClue {
@@ -34,14 +36,21 @@ export interface PlannedClue {
   clue: Clue;
 }
 
-export interface PlannedCase {
-  def: CaseDef;
+export interface PlannedSuspect {
+  /** "Le deuxième suspect", "La Pie". */
   subject: Subject;
-  /** Short form used after the first line: "Il", "Elle". */
+  /** Short form after the first line: "Il", "Elle". */
   pronoun: Subject;
   first: PlannedClue;
   /** The boss moves: a second hiding spot and clue. */
   move?: PlannedClue;
+  boss?: boolean;
+}
+
+export interface PlannedCase {
+  def: CaseDef;
+  /** In the order la centrale calls them. */
+  suspects: PlannedSuspect[];
 }
 
 function pick<T>(rng: Rng, list: readonly T[]): T {
@@ -50,23 +59,85 @@ function pick<T>(rng: Rng, list: readonly T[]): T {
   return item;
 }
 
-function plannable(street: Street, preps: readonly PrepId[], exclude?: Spot): PlannedClue[] {
-  return street.spots.filter((s) => s !== exclude).flatMap((target) => cluesFor(target, street, preps).map((clue) => ({ target, clue })));
+function shuffle<T>(rng: Rng, list: readonly T[]): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
 }
 
-export function planCase(def: CaseDef, street: Street, seed: string): PlannedCase {
-  const rng = Rng.fromSeed(`${def.id}/${seed}`);
-  if (def.boss === 'pie') {
-    // La Pie starts on a roof (she loves high places), then flies somewhere else.
-    const onRoof = plannable(street, ['sur']).filter((p) => p.clue.part === 'roof');
-    const first = pick(rng.fork('first'), onRoof);
-    const away = plannable(street, def.preps, first.target).filter((p) => Math.abs(p.target.footX - first.target.footX) > 900);
-    const move = pick(rng.fork('move'), away);
-    return { def, subject: SUBJECTS.pie, pronoun: SUBJECTS.elle, first, move };
+function plannable(street: Street, preps: readonly PrepId[]): PlannedClue[] {
+  return street.spots.flatMap((target) => cluesFor(target, street, preps).map((clue) => ({ target, clue })));
+}
+
+/** Prepositions taught in the cases before this one (review for a big gang). */
+function earlier(def: CaseDef): PrepId[] {
+  return [...new Set(CHAPTER_1.filter((c) => c.number < def.number && !c.boss).flatMap((c) => c.preps))];
+}
+
+/**
+ * Chooses `count` hiding places, each on a different spot and spread out
+ * along the street (never all in one corner). The case's own prepositions
+ * come first, taking turns; only if they run out of spots do earlier ones
+ * fill in.
+ */
+function chooseGang(rng: Rng, street: Street, def: CaseDef, count: number, taken: Spot[] = []): PlannedClue[] {
+  const own = def.preps.map((prep) => shuffle(rng.fork(`own-${prep}`), plannable(street, [prep])));
+  const review = shuffle(rng.fork('review'), plannable(street, earlier(def)));
+  const chosen: PlannedClue[] = [];
+  const used = new Set(taken.map((s) => s.id));
+  const far = (c: PlannedClue, gap: number) => [...taken, ...chosen.map((x) => x.target)].every((s) => Math.abs(s.footX - c.target.footX) >= gap);
+  const take = (c: PlannedClue) => {
+    chosen.push(c);
+    used.add(c.target.id);
+  };
+  // The case's own prepositions take turns, as far apart as the street allows.
+  const start = rng.int(0, own.length - 1);
+  for (const gap of [GANG.spreadPx, GANG.spreadPx / 2, 0]) {
+    let progress = true;
+    while (chosen.length < count && progress) {
+      progress = false;
+      for (let k = 0; k < own.length && chosen.length < count; k++) {
+        const c = own[(start + k) % own.length]!.find((x) => !used.has(x.target.id) && far(x, gap));
+        if (c) {
+          take(c);
+          progress = true;
+        }
+      }
+    }
   }
-  const options = plannable(street, def.preps);
-  // Case 4 mixes two prepositions: choose the preposition first so both come up as often.
-  const prep = pick(rng.fork('prep'), def.preps);
-  const first = pick(rng.fork('spot'), options.filter((o) => o.clue.prep === prep));
-  return { def, subject: SUBJECTS.suspect, pronoun: SUBJECTS.il, first };
+  for (const gap of [GANG.spreadPx / 2, 0]) {
+    for (const c of review) {
+      if (chosen.length >= count) break;
+      if (!used.has(c.target.id) && far(c, gap)) take(c);
+    }
+  }
+  if (chosen.length < count) throw new Error(`${def.id}: only ${chosen.length} hiding places for ${count} suspects`);
+  return shuffle(rng.fork('order'), chosen);
+}
+
+export function planCase(def: CaseDef, street: Street, seed: string, count: number): PlannedCase {
+  const rng = Rng.fromSeed(`${def.id}/${seed}/${count}`);
+  if (def.boss === 'pie') {
+    // Her gang first, then La Pie herself: she starts on a roof (she loves high places), then flies elsewhere.
+    const gang = chooseGang(rng.fork('gang'), street, def, count - 1);
+    const taken = gang.map((g) => g.target);
+    const roofs = plannable(street, ['sur']).filter((p) => p.clue.part === 'roof' && !taken.includes(p.target));
+    const apart = (gap: number) => roofs.filter((p) => taken.every((t) => Math.abs(t.footX - p.target.footX) >= gap));
+    const spread = [GANG.spreadPx, GANG.spreadPx / 2, 0].map(apart).find((l) => l.length > 0)!;
+    const first = pick(rng.fork('first'), spread);
+    const away = plannable(street, def.preps).filter((p) => p.target !== first.target && !taken.includes(p.target) && Math.abs(p.target.footX - first.target.footX) > 900);
+    const move = pick(rng.fork('move'), away);
+    return {
+      def,
+      suspects: [
+        ...gang.map((g, i) => ({ subject: ORDINALS[i]!, pronoun: SUBJECTS.il, first: g })),
+        { subject: SUBJECTS.pie, pronoun: SUBJECTS.elle, first, move, boss: true },
+      ],
+    };
+  }
+  const gang = chooseGang(rng.fork('gang'), street, def, count);
+  return { def, suspects: gang.map((g, i) => ({ subject: ORDINALS[i]!, pronoun: SUBJECTS.il, first: g })) };
 }

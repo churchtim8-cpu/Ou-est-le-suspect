@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { buildCentreVille, STREET_LINES } from '../../content/centreVille';
-import { CHAPTER_1, planCase, type PlannedCase, type PlannedClue } from '../../engine/cases';
+import { CHAPTER_1, planCase, type PlannedCase, type PlannedClue, type PlannedSuspect } from '../../engine/cases';
 import { phraseFr, sentenceEn, type Subject } from '../../engine/clues';
 import { LEVELS, TWISTS, type Level } from '../../engine/difficulty';
 import { points, stars, type CaseResult } from '../../engine/scoring';
@@ -59,6 +59,12 @@ export class CaseScene extends Phaser.Scene {
   private phase: Phase = 'intro';
   private current!: PlannedClue;
   private currentSubject!: Subject;
+  /** Which member of the gang la centrale is calling now. */
+  private which = 0;
+  private caught: boolean[] = [];
+  private suspectClock = 0;
+  private repeatsThis = 0;
+  private tracker: Phaser.GameObjects.Image[] = [];
   private timeLeft = 0;
   private elapsed = 0;
   private wrong = 0;
@@ -87,7 +93,7 @@ export class CaseScene extends Phaser.Scene {
   private recruit!: Recruit;
   private recruitTarget: number | null = null;
   private city!: CitySound;
-  private runner: { figure: Figure; speed: number } | null = null;
+  private runners: { figure: Figure; speed: number }[] = [];
 
   constructor() {
     super(CaseScene.KEY);
@@ -99,13 +105,15 @@ export class CaseScene extends Phaser.Scene {
     this.level = LEVELS[getLevel()];
     this.street = buildCentreVille();
     const seed = new URLSearchParams(window.location.search).get('seed') ?? Math.random().toString(36).slice(2, 10);
-    this.plan = planCase(def, this.street, seed);
-    this.current = this.plan.first;
-    this.currentSubject = this.plan.subject;
+    this.plan = planCase(def, this.street, seed, this.level.suspects);
+    this.which = 0;
+    this.caught = [];
+    this.current = this.gangMember().first;
+    this.currentSubject = this.gangMember().subject;
     this.phase = 'intro';
-    this.timeLeft = this.level.seconds;
+    this.timeLeft = this.totalSeconds();
     this.elapsed = 0;
-    this.wrong = this.english = this.repeats = 0;
+    this.wrong = this.english = this.repeats = this.repeatsThis = this.suspectClock = 0;
     this.moved = false;
     this.checked = new Set();
     this.lastTick = -1;
@@ -119,7 +127,7 @@ export class CaseScene extends Phaser.Scene {
 
     this.recruit = new Recruit(this, FEEL.recruitScreenX, DEPTH.nearWalkers + 1);
     this.recruitTarget = null;
-    this.runner = null;
+    this.runners = [];
     this.city = new CitySound();
     const startCity = () => void this.city.start((key) => this.cache.binary.get(key) as ArrayBuffer | undefined, this.view.cars);
     if (mixer.ctx?.state === 'running') startCity();
@@ -192,8 +200,30 @@ export class CaseScene extends Phaser.Scene {
     zone.on('pointerdown', jump);
     zone.on('pointermove', jump);
 
+    // The gang, under the radio: grey until caught.
+    const n = this.plan.suspects.length;
+    const strip = this.add.graphics();
+    strip.fillStyle(COLOURS.paper, 0.95).fillRoundedRect(12, 120, 84 + n * 40, 50, 12).lineStyle(2, COLOURS.gold, 1).strokeRoundedRect(12, 120, 84 + n * 40, 50, 12);
+    hud(strip);
+    hud(text(this, 24, 145, 'GANG', 18, COLOURS.navyText).setOrigin(0, 0.5));
+    this.tracker = this.plan.suspects.map((m, i) => {
+      const img = this.add.image(102 + i * 40, 166, m.boss ? 'pie_stand' : 'suspect_4').setOrigin(0.5, 1);
+      img.setScale(42 / img.height);
+      hud(img);
+      return img;
+    });
+    this.paintTracker();
     this.lens = this.add.graphics().setScrollFactor(0).setDepth(DEPTH.hud + 5);
     fullscreenButton(this);
+  }
+
+  private paintTracker(): void {
+    this.tracker.forEach((img, i) => {
+      const state = this.caught[i];
+      if (state === true) img.clearTint().setAlpha(1);
+      else if (state === false) img.setTint(0x882222).setTintMode(Phaser.TintModes.FILL).setAlpha(0.6);
+      else img.setTint(0x2a3550).setTintMode(Phaser.TintModes.FILL).setAlpha(i === this.which && this.phase !== 'intro' ? 1 : 0.7);
+    });
   }
 
   private setRadio(top: string, subject: Subject | null, clue: PlannedClue | null, plain?: string): void {
@@ -253,8 +283,17 @@ export class CaseScene extends Phaser.Scene {
     });
   }
 
+  private gangMember(): PlannedSuspect {
+    return this.plan.suspects[this.which]!;
+  }
+
+  private totalSeconds(): number {
+    return this.level.secondsPerSuspect * this.plan.suspects.length;
+  }
+
+  /** Repeats are counted per suspect: each new message comes with a fresh set. */
   private repeatsLeft(): number {
-    return this.level.repeats === null ? Infinity : this.level.repeats - this.repeats;
+    return this.level.repeats === null ? Infinity : this.level.repeats - this.repeatsThis;
   }
 
   private addHelpButton(): void {
@@ -268,6 +307,7 @@ export class CaseScene extends Phaser.Scene {
       this.helpBtn = button(this, 800, 44, 170, 44, `Repeat (${this.level.repeats})`, () => {
         if (this.phase !== 'search' || !this.clueHidden || this.repeatsLeft() <= 0) return;
         this.repeats++;
+        this.repeatsThis++;
         this.clueHidden = false;
         for (const t of [this.radioLead, this.radioPhrase, this.radioEnd]) t.setAlpha(1);
         this.englishLine.setText('');
@@ -294,7 +334,7 @@ export class CaseScene extends Phaser.Scene {
       layer.add(text(this, GAME_WIDTH / 2, 168, 'AVIS DE RECHERCHE', 40, COLOURS.redText).setOrigin(0.5));
       layer.add(this.add.image(GAME_WIDTH / 2 - 190, 360, 'suspect-pie').setDisplaySize(250, 250));
       layer.add(text(this, GAME_WIDTH / 2 + 160, 260, 'La Pie', 52, COLOURS.navyText).setOrigin(0.5));
-      layer.add(text(this, GAME_WIDTH / 2 + 160, 330, 'BOSS CASE\nShe loves high places…\nand she never stays still.\nListen to every message!', 22, '#3a3020', { align: 'center' }).setOrigin(0.5, 0));
+      layer.add(text(this, GAME_WIDTH / 2 + 160, 310, `BOSS CASE\nLa Pie and her gang: ${this.plan.suspects.length} to catch.\nShe loves high places…\nand she never stays still.\nListen to every message!`, 22, '#3a3020', { align: 'center' }).setOrigin(0.5, 0));
     } else {
       layer.add(text(this, GAME_WIDTH / 2, 168, def.title.toUpperCase(), 40, COLOURS.navyText).setOrigin(0.5));
       layer.add(this.add.image(GAME_WIDTH / 2 - 210, 410, 'sergeant_bust').setDisplaySize(250, 259));
@@ -303,7 +343,7 @@ export class CaseScene extends Phaser.Scene {
       bubble.fillStyle(0xffffff, 1).fillTriangle(GAME_WIDTH / 2 - 60, 300, GAME_WIDTH / 2 - 100, 330, GAME_WIDTH / 2 - 50, 285);
       layer.add(bubble);
       layer.add(text(this, GAME_WIDTH / 2 + 140, 280, 'Allez, au travail !\nÉcoutez la centrale.', 26, COLOURS.navyText, { align: 'center' }).setOrigin(0.5));
-      layer.add(text(this, GAME_WIDTH / 2 + 140, 370, `Case ${def.number} of ${CHAPTER_1.length}\nRead the radio message, then find\nand tap the suspect's hiding place.`, 20, '#3a3020', { align: 'center' }).setOrigin(0.5, 0));
+      layer.add(text(this, GAME_WIDTH / 2 + 140, 370, `Case ${def.number} of ${CHAPTER_1.length}: a gang of ${this.plan.suspects.length}!\nRead each radio message, then find\nand tap that suspect's hiding place.`, 20, '#3a3020', { align: 'center' }).setOrigin(0.5, 0));
     }
     const go = button(this, GAME_WIDTH / 2 + 150, 520, 240, 64, 'START', () => {
       layer.destroy();
@@ -328,34 +368,52 @@ export class CaseScene extends Phaser.Scene {
     const boss = this.plan.def.boss === 'pie';
     const r = FEEL.runaway;
     const x = this.cameras.main.scrollX + r.fromScreenX;
-    const figure = new Figure(this, boss ? 'pie_walk' : 'suspect_1', x, STREET_LINES.base + 30, FEEL.suspectHeight).setDepth(DEPTH.suspectFar);
-    this.runner = { figure, speed: r.speed };
+    // The whole gang bolts, one after another (La Pie last).
+    this.runners = this.plan.suspects.map((m, i) => ({
+      figure: new Figure(this, m.boss ? 'pie_walk' : 'suspect_1', x - i * 95, STREET_LINES.base + 30, FEEL.suspectHeight).setDepth(DEPTH.suspectFar),
+      speed: r.speed + i * 25,
+    }));
     this.time.delayedCall(350, () => (this.recruitTarget = this.cameras.main.scrollX + 900));
-    this.say(x, STREET_LINES.base - 70, boss ? 'Attrapez-moi !' : 'Hi hi ! Cherchez-moi !');
+    this.say(x, STREET_LINES.base - 70, boss ? 'Attrapez-nous !' : 'Hi hi ! Cherchez-nous !');
     this.time.delayedCall(500, () => this.say(this.recruit.x, 600, 'Halte ! Police !'));
-    this.time.delayedCall(r.seconds * 1000, () => {
-      this.runner?.figure.destroy();
-      this.runner = null;
+    this.time.delayedCall((r.seconds + 0.2 * this.plan.suspects.length) * 1000, () => {
+      for (const ru of this.runners) ru.figure.destroy();
+      this.runners = [];
       this.recruitTarget = null;
       this.startRadio();
     });
   }
 
   private startRadio(): void {
+    this.addHelpButton();
+    this.callSuspect(this.plan.def.boss ? 'LA CENTRALE · Attention, patrouille 7 !' : 'LA CENTRALE · Patrouille 7, ici la centrale !');
+  }
+
+  /** La centrale gives the next member of the gang's hiding place. */
+  private callSuspect(top: string): void {
     this.phase = 'radio';
-    music.play('search');
-    const top = this.plan.def.boss ? 'LA CENTRALE · Attention, patrouille 7 !' : 'LA CENTRALE · Patrouille 7, ici la centrale !';
+    music.play(this.timeLeft <= 15 ? 'urgent' : 'search');
+    const m = this.gangMember();
+    this.current = m.first;
+    this.currentSubject = m.subject;
+    this.moved = false;
+    this.suspectClock = 0;
+    this.repeatsThis = 0;
+    this.checked.clear();
+    this.clueHidden = false;
+    for (const t of [this.radioLead, this.radioPhrase, this.radioEnd]) t.setAlpha(1);
+    if (!this.level.englishHelp) this.helpBtn?.setLabel(`Repeat (${this.level.repeats})`);
+    this.paintTracker();
     this.time.delayedCall(350, () =>
       this.typeRadio(top, this.currentSubject, this.current, () => {
         this.phase = 'search';
-        this.addHelpButton();
         this.hideClueLater();
       }),
     );
   }
 
   private moveBoss(): void {
-    const move = this.plan.move;
+    const move = this.gangMember().move;
     if (!move || this.moved) return;
     this.moved = true;
     const from = this.current.target;
@@ -365,7 +423,7 @@ export class CaseScene extends Phaser.Scene {
     if (move.target.footX < from.footX) pie.setFlipX(true);
     this.tweens.add({ targets: pie, x: from.footX + (move.target.footX < from.footX ? -500 : 500), y: from.footY - 120, alpha: 0, duration: 1100, ease: 'Quad.in', onComplete: () => pie.destroy() });
     this.current = move;
-    this.currentSubject = this.plan.pronoun;
+    this.currentSubject = this.gangMember().pronoun;
     this.checked.clear();
     this.clueHidden = false;
     for (const t of [this.radioLead, this.radioPhrase, this.radioEnd]) t.setAlpha(1);
@@ -482,7 +540,7 @@ export class CaseScene extends Phaser.Scene {
   // ---------------------------------------------------------------- endings
 
   private suspectSprite(spot: Spot): Phaser.GameObjects.Image {
-    const boss = this.plan.def.boss === 'pie';
+    const boss = this.gangMember().boss === true;
     let key: string;
     let height: number = FEEL.suspectHeight;
     if (boss) key = spot.zone === 'roof' ? 'pie_ring' : 'pie_stand';
@@ -502,7 +560,10 @@ export class CaseScene extends Phaser.Scene {
     this.hover.clear();
     this.lens.clear();
     this.input.setDefaultCursor('default');
-    music.play('off');
+    this.caught[this.which] = true;
+    this.paintTracker();
+    const last = this.which === this.plan.suspects.length - 1;
+    if (last) music.play('off');
     const spot = this.current.target;
     this.recruitTarget = spot.footX + (spot.footX > this.recruit.x ? -80 : 80);
     const who = this.suspectSprite(spot);
@@ -518,16 +579,27 @@ export class CaseScene extends Phaser.Scene {
       cam.shake(160, 0.006);
       // Stamped away from the suspect so the catch stays visible.
       const stampY = spot.footY < 320 ? 560 : 170;
-      const stamp = text(this, GAME_WIDTH / 2, stampY, 'ARRÊTÉ !', 110, COLOURS.redText, { stroke: '#ffffff', strokeThickness: 12 })
+      const count = `${this.caught.filter(Boolean).length} / ${this.plan.suspects.length}`;
+      const stamp = text(this, GAME_WIDTH / 2, stampY, last ? 'ARRÊTÉS !' : `ARRÊTÉ ! ${count}`, last ? 110 : 84, COLOURS.redText, { stroke: '#ffffff', strokeThickness: 12 })
         .setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.hud + 20).setAngle(-12).setScale(3).setAlpha(0);
       this.tweens.add({ targets: stamp, scale: 1, alpha: 1, duration: 260, ease: 'Quad.in' });
-      this.confetti();
-      sounds.victory();
-      this.time.delayedCall(1700, () => {
+      if (last) {
+        this.confetti();
+        sounds.victory();
+      } else sounds.star(Math.min(2, this.which));
+      this.time.delayedCall(last ? 1700 : 1300, () => {
         stamp.destroy();
         // Back to normal size first: the report is drawn on the screen, and the zoom would enlarge it.
         cam.zoomTo(1, 250, 'Sine.easeInOut');
-        this.time.delayedCall(260, () => this.report(true));
+        // Taken away: the next one is still out there.
+        this.tweens.add({ targets: who, alpha: 0, duration: 300, onComplete: () => who.destroy() });
+        this.time.delayedCall(260, () => {
+          this.recruitTarget = null;
+          if (last) return this.report();
+          this.which++;
+          const left = this.plan.suspects.length - this.which;
+          this.callSuspect(left === 1 ? 'LA CENTRALE · Bravo ! Encore un suspect !' : `LA CENTRALE · Bravo ! Encore ${left} suspects !`);
+        });
       });
     });
   }
@@ -542,18 +614,22 @@ export class CaseScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.pan(centreX(spot), panY(spot), 700, 'Sine.easeInOut');
     this.time.delayedCall(750, () => {
-      const boss = this.plan.def.boss === 'pie';
+      const boss = this.gangMember().boss === true;
+      for (let i = this.which; i < this.plan.suspects.length; i++) this.caught[i] = false;
+      this.paintTracker();
+      const away = this.plan.suspects.length - this.which;
       const runner = new Figure(this, boss ? 'pie_walk' : 'suspect_1', spot.footX, spot.footY, FEEL.suspectHeight).setDepth(DEPTH.effects);
-      this.runner = { figure: runner, speed: 520 };
+      this.runners = [{ figure: runner, speed: 520 }];
       this.say(spot.footX, spot.footY - 90, boss ? 'Au revoir !' : 'Hi hi !');
       this.recruitTarget = spot.footX + 600;
       sounds.escape();
       const t = text(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, 'Oh non ! Il s’échappe !', 64, '#ffffff', { stroke: COLOURS.navyText, strokeThickness: 10 })
         .setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.hud + 20);
-      if (boss) t.setText('Oh non ! Elle s’échappe !');
+      if (away > 1) t.setText('Oh non ! Ils s’échappent !');
+      else if (boss) t.setText('Oh non ! Elle s’échappe !');
       this.time.delayedCall(1900, () => {
         t.destroy();
-        this.report(false);
+        this.report();
       });
     });
   }
@@ -575,11 +651,15 @@ export class CaseScene extends Phaser.Scene {
     }
   }
 
-  private report(caught: boolean): void {
+  private report(): void {
     this.phase = 'report';
     this.helpBtn?.container.destroy();
+    const gang = this.plan.suspects;
+    const caught = this.caught.filter(Boolean).length;
+    const all = caught === gang.length;
     const result: CaseResult = {
       caught,
+      suspects: gang.length,
       secondsUsed: this.elapsed,
       secondsLeft: this.timeLeft,
       wrongTaps: this.wrong,
@@ -590,49 +670,57 @@ export class CaseScene extends Phaser.Scene {
     const nStars = stars(result);
     const layer = this.add.container(0, 0).setScrollFactor(0).setDepth(DEPTH.hud + 30);
     layer.add(this.add.graphics().fillStyle(0x0a1020, 0.6).fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT));
-    const x0 = GAME_WIDTH / 2 - 420;
-    const y0 = 90;
+    const x0 = GAME_WIDTH / 2 - 440;
+    const y0 = 40;
+    const H = 640;
     const g = this.add.graphics();
-    g.fillStyle(0x000000, 0.35).fillRoundedRect(x0 + 6, y0 + 8, 840, 520, 22);
-    g.fillStyle(COLOURS.paper, 1).fillRoundedRect(x0, y0, 840, 520, 22);
-    g.fillStyle(caught ? COLOURS.green : COLOURS.red, 1).fillRoundedRect(x0, y0, 840, 70, { tl: 22, tr: 22, bl: 0, br: 0 });
+    g.fillStyle(0x000000, 0.35).fillRoundedRect(x0 + 6, y0 + 8, 880, H, 22);
+    g.fillStyle(COLOURS.paper, 1).fillRoundedRect(x0, y0, 880, H, 22);
+    g.fillStyle(all ? COLOURS.green : COLOURS.red, 1).fillRoundedRect(x0, y0, 880, 62, { tl: 22, tr: 22, bl: 0, br: 0 });
     layer.add(g);
-    layer.add(text(this, GAME_WIDTH / 2, y0 + 35, caught ? 'RAPPORT : SUSPECT ARRÊTÉ' : 'RAPPORT : SUSPECT ÉCHAPPÉ', 32, '#ffffff').setOrigin(0.5));
+    layer.add(text(this, GAME_WIDTH / 2, y0 + 31, all ? 'RAPPORT : GANG ARRÊTÉ' : `RAPPORT : ${caught} SUR ${gang.length} ARRÊTÉS`, 30, '#ffffff').setOrigin(0.5));
 
-    // The answer sentence, with the preposition in colour.
-    layer.add(text(this, GAME_WIDTH / 2, y0 + 96, caught ? 'You found the hiding place:' : 'The hiding place was:', 20, '#5a4a35').setOrigin(0.5, 0));
-    const lead = text(this, 0, y0 + 130, `${this.currentSubject.fr} est `, 38, COLOURS.navyText);
-    const phrase = text(this, 0, y0 + 130, phraseFr(this.current.clue), 38, COLOURS.prepText);
-    const end = text(this, 0, y0 + 130, '.', 38, COLOURS.navyText);
-    const total = lead.width + phrase.width + end.width;
-    lead.x = GAME_WIDTH / 2 - total / 2;
-    phrase.x = lead.x + lead.width;
-    end.x = phrase.x + phrase.width;
-    layer.add([lead, phrase, end]);
-    if (this.level.englishHelp) layer.add(text(this, GAME_WIDTH / 2, y0 + 182, sentenceEn(this.currentSubject, this.current.clue), 20, '#6a5a45', { fontStyle: 'italic' }).setOrigin(0.5, 0));
+    // Every hiding place, with the preposition in colour: ✓ caught, ✗ got away.
+    const english = this.level.englishHelp;
+    const rowH = english ? 52 : 40;
+    const top = y0 + 78;
+    gang.forEach((m, i) => {
+      const y = top + i * rowH;
+      // The boss's last known place, if she flew off during her turn.
+      const where = m.move && i === this.which && this.moved ? m.move : m.first;
+      const ok = this.caught[i] === true;
+      layer.add(text(this, x0 + 40, y, ok ? '✓' : '✗', 28, ok ? '#2e8b3a' : COLOURS.redText));
+      const lead = text(this, x0 + 80, y, `${m.subject.fr} est `, 27, COLOURS.navyText);
+      const phrase = text(this, lead.x + lead.width, y, phraseFr(where.clue), 27, COLOURS.prepText);
+      const end = text(this, phrase.x + phrase.width, y, '.', 27, COLOURS.navyText);
+      layer.add([lead, phrase, end]);
+      if (english) layer.add(text(this, x0 + 80, y + 30, sentenceEn(m.subject, where.clue), 16, '#6a5a45', { fontStyle: 'italic' }));
+    });
 
     // Stars, one by one.
+    const yStars = top + gang.length * rowH + 50;
     for (let i = 0; i < 3; i++) {
-      const s = text(this, GAME_WIDTH / 2 - 110 + i * 110, y0 + 270, '★', 84, i < nStars ? '#f2b134' : '#d8cdb3', { stroke: '#8a6a20', strokeThickness: i < nStars ? 4 : 0 }).setOrigin(0.5).setScale(0);
+      const s = text(this, GAME_WIDTH / 2 - 100 + i * 100, yStars, '★', 72, i < nStars ? '#f2b134' : '#d8cdb3', { stroke: '#8a6a20', strokeThickness: i < nStars ? 4 : 0 }).setOrigin(0.5).setScale(0);
       layer.add(s);
       this.tweens.add({ targets: s, scale: 1, delay: 300 + i * 260, duration: 260, ease: 'Back.out', onStart: () => i < nStars && sounds.star(i) });
     }
     const pts = points(result);
-    layer.add(text(this, GAME_WIDTH / 2, y0 + 330, `${pts} points`, 30, COLOURS.navyText).setOrigin(0.5, 0));
-    layer.add(text(this, GAME_WIDTH / 2, y0 + 370, `Time ${Math.round(this.elapsed)} s   ·   Wrong taps ${this.wrong}${this.english ? '   ·   English help used' : ''}${this.repeats ? `   ·   Repeats ${this.repeats}` : ''}`, 18, '#5a4a35').setOrigin(0.5, 0));
+    layer.add(text(this, GAME_WIDTH / 2, yStars + 42, `${pts} points`, 28, COLOURS.navyText).setOrigin(0.5, 0));
+    layer.add(text(this, GAME_WIDTH / 2, yStars + 76, `Time ${Math.round(this.elapsed)} s   ·   Wrong taps ${this.wrong}${this.english ? '   ·   English help used' : ''}${this.repeats ? `   ·   Repeats ${this.repeats}` : ''}${all ? '' : '   ·   Catch the whole gang to earn stars'}`, 17, '#5a4a35').setOrigin(0.5, 0));
+    const yBtn = y0 + H - 50;
 
     // A recruit cheers (or consoles) in French.
     const praise = ['Courage !', 'Pas mal !', 'Bravo !', 'Excellent !'][nStars] ?? 'Bravo !';
-    const recruit = this.add.image(x0 + 90, y0 + 430, nStars >= 2 ? 'recruit_girl_bust' : 'recruit_boy_bust').setDisplaySize(150, 155);
+    const recruit = this.add.image(x0 + 80, yBtn - 30, nStars >= 2 ? 'recruit_girl_bust' : 'recruit_boy_bust').setDisplaySize(120, 124);
     layer.add(recruit);
-    layer.add(text(this, x0 + 175, y0 + 405, praise, 30, COLOURS.navyText));
+    layer.add(text(this, x0 + 150, yBtn - 20, praise, 30, COLOURS.navyText).setOrigin(0, 0.5));
 
     const idx = CHAPTER_1.findIndex((c) => c.id === this.plan.def.id);
     const next = CHAPTER_1[idx + 1];
     const btns: ReturnType<typeof button>[] = [];
-    btns.push(button(this, GAME_WIDTH / 2 + 30, y0 + 470, 200, 54, 'Play again', () => goTo(this, 'case', { caseId: this.plan.def.id }), COLOURS.navy, '#ffffff'));
-    btns.push(button(this, GAME_WIDTH / 2 + 250, y0 + 470, 200, 54, 'Case board', () => goTo(this, 'chapter'), COLOURS.navy, '#ffffff'));
-    if (caught && next) btns.push(button(this, GAME_WIDTH / 2 + 250, y0 + 400, 200, 54, 'Next case ▶', () => goTo(this, 'case', { caseId: next.id }), COLOURS.red, '#ffffff'));
+    btns.push(button(this, GAME_WIDTH / 2 + 10, yBtn, 190, 54, 'Play again', () => goTo(this, 'case', { caseId: this.plan.def.id }), COLOURS.navy, '#ffffff'));
+    btns.push(button(this, GAME_WIDTH / 2 + 210, yBtn, 190, 54, 'Case board', () => goTo(this, 'chapter'), COLOURS.navy, '#ffffff'));
+    if (all && next) btns.push(button(this, GAME_WIDTH / 2 + 210, yBtn - 64, 190, 54, 'Next case ▶', () => goTo(this, 'case', { caseId: next.id }), COLOURS.red, '#ffffff'));
     for (const b of btns) b.container.setScrollFactor(0).setDepth(DEPTH.hud + 31);
     music.play('title');
   }
@@ -648,7 +736,7 @@ export class CaseScene extends Phaser.Scene {
     this.view.update(time, delta);
     const cam = this.cameras.main;
     const dt = Math.min(delta, 100) / 1000;
-    if (this.runner) this.runner.figure.move(this.runner.speed * dt);
+    for (const ru of this.runners) ru.figure.move(ru.speed * dt);
     // The recruit keeps up with the view, or runs to the suspect at the end.
     this.recruit.update(this.recruitTarget ?? cam.scrollX + FEEL.recruitScreenX, dt);
     this.city.footsteps(this.recruit.running, dt);
@@ -668,7 +756,8 @@ export class CaseScene extends Phaser.Scene {
       if (secs !== this.lastTick && secs <= 10 && secs > 0) sounds.tick(secs <= 5);
       this.lastTick = secs;
       if (this.timeLeft <= 15) music.play('urgent');
-      if (this.plan.move && !this.moved && this.elapsed >= TWISTS.moveAfterSeconds) this.moveBoss();
+      this.suspectClock += dt;
+      if (this.gangMember().move && !this.moved && this.suspectClock >= TWISTS.moveAfterSeconds) this.moveBoss();
       if (this.timeLeft <= 0) this.escaped();
     }
     this.drawTimer();
@@ -680,7 +769,7 @@ export class CaseScene extends Phaser.Scene {
     const g = this.timerRing;
     const cx = GAME_WIDTH - 66;
     const cy = 62;
-    const share = this.timeLeft / this.level.seconds;
+    const share = this.timeLeft / this.totalSeconds();
     const urgent = this.timeLeft <= 15;
     g.clear();
     g.fillStyle(COLOURS.navy, 0.94).fillCircle(cx, cy, 46);

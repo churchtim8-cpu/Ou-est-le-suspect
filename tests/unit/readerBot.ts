@@ -9,7 +9,7 @@ import { holds, type Clue } from '../../src/engine/clues';
  * missing "de" makes it fail), then lists every spot that fits.
  */
 export function readClue(sentence: string): Clue | null {
-  const m = /^(?:Le suspect|Il|La Pie|Elle) est (.+)\.$/.exec(sentence);
+  const m = /^(?:Le suspect|Le (?:premier|deuxième|troisième|quatrième|cinquième) suspect|Il|La Pie|Elle) est (.+)\.$/.exec(sentence);
   if (!m || !m[1]) return null;
   const rest = m[1];
   // Longest preposition first ("à côté" before "à").
