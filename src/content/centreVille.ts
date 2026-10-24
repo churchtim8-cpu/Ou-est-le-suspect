@@ -44,6 +44,8 @@ export interface PropPlacement {
   height: number;
   width: number;
   flip?: boolean;
+  /** On the far pavement (behind the traffic), not the near one. */
+  far?: boolean;
   zones: PropZones;
 }
 
@@ -69,6 +71,7 @@ export const PROPS_LAYOUT: readonly PropPlacement[] = [
   { id: 'bin_2', thing: 'bin', picture: 'bin', x: 4800, footY: NEAR, height: 58, width: 43, zones: { behind: true } },
   { id: 'blue_car', thing: 'blue_car', picture: 'car_1', x: 4990, footY: STREET_LINES.parkedY, height: 92, width: 194, flip: true, zones: { behind: true, beside: 'right' } },
   { id: 'bus_stop', thing: 'bus_stop', picture: 'bus_shelter', x: 5450, footY: NEAR, height: 140, width: 165, zones: { behind: true, beside: 'right' } },
+  { id: 'corner_sign', thing: null, picture: 'corner_sign', x: 6752, footY: STREET_LINES.base + 20, height: 190, width: 139, far: true, zones: {} },
   { id: 'phone_box', thing: 'phone_box', picture: 'phone_box', x: 6250, footY: NEAR, height: 150, width: 65, zones: { behind: true, beside: 'right' } },
 ];
 
@@ -90,6 +93,9 @@ const SQUARE = {
   backX: 3122,
   backY: 368,
 };
+
+/** The museum's front steps, measured on its picture. */
+const STAIRS = { x0: 6050, x1: 6480, topX: 6400, topY: 412, bottomX: 6100, bottomY: 470 };
 
 /** How far from a street thing's edge someone stands "à côté" of it. */
 const BESIDE_GAP = 50;
@@ -136,6 +142,11 @@ export function buildCentreVille(): Street {
   const last = row.at(-1)!;
   if (layout.width - last.x1 >= MIN_GAP) pavement('street.end', 'end', (last.x1 + layout.width) / 2);
   landmarks.push({ thing: 'street', kind: 'street', x0: 0, x1: layout.width });
+  // The museum's steps (in its picture): someone at the top by the columns, someone on the bottom step.
+  const st = STAIRS;
+  landmarks.push({ thing: 'stairs', kind: 'prop', x0: st.x0, x1: st.x1 });
+  spots.push({ id: 'stairs.top', zone: 'top', of: 'stairs', x: st.topX - 45, y: st.topY - 84, w: 90, h: 86, footX: st.topX, footY: st.topY });
+  spots.push({ id: 'stairs.bottom', zone: 'bottom', of: 'stairs', x: st.bottomX - 45, y: st.bottomY - 92, w: 90, h: 92, footX: st.bottomX, footY: st.bottomY });
   for (const [place, x] of Object.entries(OPPOSITE)) {
     spots.push({ id: `${place}.opposite`, zone: 'opposite', of: place, x: x - 50, y: NEAR - 110, w: 100, h: 110, footX: x, footY: NEAR - 2 });
   }

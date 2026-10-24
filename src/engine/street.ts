@@ -22,7 +22,9 @@ export type Zone =
   | 'against' // leaning on a street thing (a lamp post)
   | 'opposite' // on the near pavement, across the road from a place
   | 'edge' // on the edge of the fountain
-  | 'back'; // at the back of the square
+  | 'back' // at the back of the square
+  | 'top' // at the top of the museum steps
+  | 'bottom'; // at the bottom of the museum steps
 
 export interface Landmark {
   /** Tells apart two of the same thing ("bench_2"); defaults to `thing`. */

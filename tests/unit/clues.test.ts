@@ -160,6 +160,14 @@ describe('chapter 1 cases', () => {
     expect(phraseFr({ prep: 'au_fond', ref: 'square' })).toBe('au fond de la place');
   });
 
+  it('the museum steps and the corner', () => {
+    expect(phraseFr({ prep: 'en_haut', ref: 'stairs' })).toBe('en haut des escaliers du musée');
+    expect(phraseFr({ prep: 'en_bas', ref: 'stairs' })).toBe('en bas des escaliers du musée');
+    expect(phraseFr({ prep: 'au_coin', ref: 'street' })).toBe('au coin de la rue');
+    expect(matches({ prep: 'en_haut', ref: 'stairs' }, street).map((x) => x.id)).toEqual(['stairs.top']);
+    expect(matches({ prep: 'au_coin', ref: 'street' }, street).map((x) => x.id)).toEqual(['street.end']);
+  });
+
   it('en face de is across the road, devant is this side', () => {
     expect(matches({ prep: 'en_face', ref: 'bank' }, street).map((x) => x.id)).toEqual(['bank.opposite']);
     expect(matches({ prep: 'devant', ref: 'bank' }, street).map((x) => x.id)).toEqual(['bank.front']);
@@ -171,6 +179,7 @@ describe('chapter 1 cases', () => {
     [6, ['en_face']],
     [7, ['pres', 'loin', 'contre']],
     [8, ['au_milieu', 'au_bord', 'au_fond']],
+    [9, ['en_haut', 'en_bas', 'au_coin']],
   ] as const)('case %i uses each of its new prepositions', (i, want) => {
     const preps = new Set(seeds.flatMap((s) => planCase(CHAPTER_1[i]!, street, s, 5).suspects.flatMap((x) => teaches(x.first.clue))));
     for (const p of want) expect(preps.has(p), p).toBe(true);

@@ -26,7 +26,7 @@ export class BootScene extends Phaser.Scene {
     for (let i = 0; i < 6; i++) img(`car_${i}`, `sprites/car_${i}`);
     img('tree', 'sprites/tree');
     img('bench', 'sprites/bench');
-    for (const k of ['lamp', 'kiosk', 'bus_shelter', 'parasol', 'flower_stall', 'phone_box', 'bin']) img(k, `sprites/${k}`);
+    for (const k of ['lamp', 'kiosk', 'bus_shelter', 'parasol', 'flower_stall', 'phone_box', 'bin', 'corner_sign']) img(k, `sprites/${k}`);
     for (const n of ['walk', 'run', 'stand', 'ring']) img(`pie_${n}`, `sprites/pie_${n}`);
     // Walk cycles (scripts/art/legs.py) and the recruit's run.
     for (const key of WALKERS) for (let i = 0; i < WALK_FRAMES; i++) img(`${key}_${i}`, `walk/${key}_${i}`);

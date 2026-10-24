@@ -11,6 +11,7 @@ import { lightGraphics } from './graphics';
 
 export const DEPTH = {
   street: 0,
+  farProps: 9,
   farWalkers: 10,
   suspectFar: 12,
   traffic: 20,
@@ -48,7 +49,7 @@ export class StreetView {
       scene.add.image(i * TILES.width, 0, `street_${i}`).setOrigin(0, 0).setScale(1 / TILES.scale).setDepth(DEPTH.street);
     }
     for (const p of PROPS_LAYOUT) {
-      const img = scene.add.image(p.x, p.footY, p.picture).setOrigin(0.5, 1).setDepth(DEPTH.props);
+      const img = scene.add.image(p.x, p.footY, p.picture).setOrigin(0.5, 1).setDepth(p.far ? DEPTH.farProps : DEPTH.props);
       img.setScale(p.height / img.height);
       if (p.flip) img.setFlipX(true);
     }

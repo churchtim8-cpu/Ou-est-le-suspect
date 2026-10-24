@@ -58,7 +58,7 @@ export const ORDINALS: readonly Subject[] = [
 ];
 
 /** Prepositions the street model can decide today (chapter 1). */
-export const MODELLED: readonly PrepId[] = ['devant', 'derriere', 'sur', 'sous', 'dans', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin', 'au_milieu', 'au_bord', 'au_fond'];
+export const MODELLED: readonly PrepId[] = ['devant', 'derriere', 'sur', 'sous', 'dans', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin', 'au_milieu', 'au_bord', 'au_fond', 'en_haut', 'en_bas', 'au_coin'];
 
 /** Clues about a street thing, which "près de" / "loin de" can narrow down when there are two of it. */
 const NARROWABLE: readonly PrepId[] = ['sous', 'derriere', 'contre', 'a_cote'];
@@ -139,7 +139,13 @@ function holdsAt(clue: Clue, mark: Landmark, spot: Spot, street: Street): boolea
       // Only street things: a place has two sides, so "à côté de la banque" would point two ways.
       return mark.kind === 'prop' && spot.zone === 'beside' && mine;
     case 'au_bout':
+    case 'au_coin':
+      // The far end of the street is a corner (the signpost stands there).
       return mark.kind === 'street' && spot.zone === 'end';
+    case 'en_haut':
+      return mark.kind === 'prop' && mine && spot.zone === 'top';
+    case 'en_bas':
+      return mark.kind === 'prop' && mine && spot.zone === 'bottom';
     default:
       return false;
   }
