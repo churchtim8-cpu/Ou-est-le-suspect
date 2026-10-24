@@ -94,6 +94,13 @@ const SQUARE = {
   backY: 368,
 };
 
+/** Upstairs windows and balconies over the door, measured on the pictures (feet on the sill). */
+const UPPER: Record<string, { x: number; y: number }> = {
+  police_station: { x: 668, y: 318 },
+  post_office: { x: 1268, y: 298 },
+  school: { x: 5193, y: 294 },
+};
+
 /** The museum's front steps, measured on its picture. */
 const STAIRS = { x0: 6050, x1: 6480, topX: 6400, topY: 412, bottomX: 6100, bottomY: 470 };
 
@@ -117,6 +124,7 @@ export function buildCentreVille(): Street {
       const f = SQUARE.fountain;
       landmarks.push({ thing: 'fountain', kind: 'prop', x0: f.x0, x1: f.x1 });
       spots.push({ id: 'fountain.edge', zone: 'edge', of: 'fountain', x: f.edgeX - 45, y: f.rimY - 82, w: 90, h: 86, footX: f.edgeX, footY: f.rimY });
+      spots.push({ id: 'fountain.around', zone: 'around', of: 'fountain', x: f.edgeX + 50, y: f.rimY - 84, w: 150, h: 84, footX: f.edgeX + 120, footY: f.rimY - 4 });
       spots.push({ id: 'square.back', zone: 'back', of: 'square', x: SQUARE.backX - 40, y: SQUARE.backY - 72, w: 80, h: 76, footX: SQUARE.backX, footY: SQUARE.backY });
       return;
     }
@@ -142,6 +150,9 @@ export function buildCentreVille(): Street {
   const last = row.at(-1)!;
   if (layout.width - last.x1 >= MIN_GAP) pavement('street.end', 'end', (last.x1 + layout.width) / 2);
   landmarks.push({ thing: 'street', kind: 'street', x0: 0, x1: layout.width });
+  for (const [place, u] of Object.entries(UPPER)) {
+    spots.push({ id: `${place}.upper`, zone: 'upper', of: place, x: u.x - 34, y: u.y - 60, w: 68, h: 62, footX: u.x, footY: u.y });
+  }
   // The museum's steps (in its picture): someone at the top by the columns, someone on the bottom step.
   const st = STAIRS;
   landmarks.push({ thing: 'stairs', kind: 'prop', x0: st.x0, x1: st.x1 });

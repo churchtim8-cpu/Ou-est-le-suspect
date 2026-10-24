@@ -1,5 +1,5 @@
-import { GANG } from './difficulty';
-import { cluesFor, ORDINALS, QUALIFIERS, SUBJECTS, type Clue, type Qualifier, type Subject } from './clues';
+import { GANG, STRETCH } from './difficulty';
+import { cluesFor, ORDINALS, QUALIFIERS, STRETCH_OF, SUBJECTS, type Clue, type Qualifier, type Subject } from './clues';
 import type { PrepId } from './prepositions';
 import { Rng } from './rng';
 import type { Spot, Street } from './street';
@@ -35,13 +35,14 @@ export const CHAPTER_1: readonly CaseDef[] = [
   { id: 'c1-7', number: 7, title: 'Affaire n°7', blurb: 'Across the road', preps: ['en_face'] },
   { id: 'c1-8', number: 8, title: 'Affaire n°8', blurb: 'Near, far, leaning', preps: ['pres', 'loin', 'contre'] },
   { id: 'c1-9', number: 9, title: 'Affaire n°9', blurb: 'A gang in the square', preps: ['au_milieu', 'au_bord', 'au_fond'], together: true },
-  { id: 'c1-10', number: 10, title: 'Affaire n°10', blurb: 'Up, down, round the corner', preps: ['en_haut', 'en_bas', 'au_coin'], together: true },
+  { id: 'c1-10', number: 10, title: 'Affaire n°10', blurb: 'Up, down, the corner', preps: ['en_haut', 'en_bas', 'au_coin'], together: true },
+  { id: 'c1-11', number: 11, title: 'Affaire n°11', blurb: 'High up and round', preps: ['au_dessus', 'autour'] },
   {
-    id: 'c1-11',
-    number: 11,
+    id: 'c1-12',
+    number: 12,
     title: 'La Pie',
     blurb: "BOSS: La Pie's gang",
-    preps: ['devant', 'dans', 'sur', 'sous', 'derriere', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin', 'au_milieu', 'au_bord', 'au_fond', 'en_haut', 'en_bas', 'au_coin'],
+    preps: ['devant', 'dans', 'sur', 'sous', 'derriere', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin', 'au_milieu', 'au_bord', 'au_fond', 'en_haut', 'en_bas', 'au_coin', 'au_dessus', 'autour'],
     boss: 'pie',
   },
 ];
@@ -147,7 +148,23 @@ function chooseGang(rng: Rng, street: Street, def: CaseDef, count: number, taken
   return shuffle(rng.fork('order'), chosen);
 }
 
-export function planCase(def: CaseDef, street: Street, seed: string, count: number): PlannedCase {
+export interface PlanOptions {
+  /** Hard: switch some clues to their stretch wording ("à l'intérieur du musée"). Same spots, so still unambiguous. */
+  stretch?: boolean;
+}
+
+export function planCase(def: CaseDef, street: Street, seed: string, count: number, opts: PlanOptions = {}): PlannedCase {
+  const plan = planPlain(def, street, seed, count);
+  if (!opts.stretch) return plan;
+  const rng = Rng.fromSeed(`${def.id}/${seed}/${count}/stretch`);
+  const reword = (p: PlannedClue): PlannedClue => {
+    const to = STRETCH_OF[p.clue.prep];
+    return to && rng.chance(STRETCH.share) ? { target: p.target, clue: { ...p.clue, prep: to } } : p;
+  };
+  return { def, suspects: plan.suspects.map((s) => ({ ...s, first: reword(s.first), move: s.move && reword(s.move) })) };
+}
+
+function planPlain(def: CaseDef, street: Street, seed: string, count: number): PlannedCase {
   const rng = Rng.fromSeed(`${def.id}/${seed}/${count}`);
   if (def.boss === 'pie') {
     // Her gang first, then La Pie herself: she starts on a roof (she loves high places), then flies elsewhere.

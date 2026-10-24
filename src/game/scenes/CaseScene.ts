@@ -26,6 +26,11 @@ const FEEL = {
   suspectHeight: 82,
   /** People on the near pavement look bigger (closer), like the walkers there. */
   nearSuspectHeight: 96,
+  /** "Autour de la fontaine": how wide and how fast the caught suspect's lap is. */
+  aroundRadius: 120,
+  /** Someone at an upstairs window or balcony: about the window's height. */
+  windowHeight: 54,
+  aroundLapMs: 1400,
   /** Height lost for each pixel further back than the far pavement (the back of the square). */
   shrinkPerPx: 0.2,
   crouchHeight: 56,
@@ -109,7 +114,7 @@ export class CaseScene extends Phaser.Scene {
     this.level = LEVELS[getLevel()];
     this.street = buildCentreVille();
     const seed = new URLSearchParams(window.location.search).get('seed') ?? Math.random().toString(36).slice(2, 10);
-    this.plan = planCase(def, this.street, seed, this.level.suspects);
+    this.plan = planCase(def, this.street, seed, this.level.suspects, { stretch: this.level.stretch });
     this.which = 0;
     this.caught = [];
     this.current = this.gangMember().first;
@@ -561,11 +566,26 @@ export class CaseScene extends Phaser.Scene {
       height -= Math.max(0, STREET_LINES.base + 22 - spot.footY) * FEEL.shrinkPerPx;
     }
     if (spot.zone === 'behind' && spot.of.startsWith('bin')) height = FEEL.crouchHeight;
+    if (spot.zone === 'upper') height = FEEL.windowHeight;
     if (spot.zone === 'under') height = (boss ? 1.15 : 1) * (spot.of.startsWith('bench') ? FEEL.benchCrouchHeight : FEEL.crouchHeight);
     const near = spot.zone === 'under' || spot.zone === 'beside' || spot.zone === 'against' || spot.zone === 'opposite';
     const depth = spot.zone === 'behind' ? DEPTH.suspectBehind : near ? DEPTH.suspectNear : DEPTH.suspectFar;
     const img = this.add.image(spot.footX, spot.footY, key).setOrigin(0.5, 1).setDepth(depth);
     img.setScale(height / img.height);
+    if (spot.zone === 'around') {
+      // Caught running round the fountain: a lap along its front rim before the stamp.
+      const lap = { a: 0 };
+      this.tweens.add({
+        targets: lap,
+        a: Math.PI * 2,
+        duration: FEEL.aroundLapMs,
+        repeat: 1,
+        onUpdate: () => {
+          img.setPosition(spot.footX + Math.cos(lap.a) * FEEL.aroundRadius, spot.footY + Math.sin(lap.a) * 6);
+          img.setFlipX(Math.sin(lap.a) > 0);
+        },
+      });
+    }
     return img;
   }
 

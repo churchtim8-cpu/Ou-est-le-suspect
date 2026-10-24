@@ -58,10 +58,13 @@ export const ORDINALS: readonly Subject[] = [
 ];
 
 /** Prepositions the street model can decide today (chapter 1). */
-export const MODELLED: readonly PrepId[] = ['devant', 'derriere', 'sur', 'sous', 'dans', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin', 'au_milieu', 'au_bord', 'au_fond', 'en_haut', 'en_bas', 'au_coin'];
+export const MODELLED: readonly PrepId[] = ['devant', 'derriere', 'sur', 'sous', 'dans', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin', 'au_milieu', 'au_bord', 'au_fond', 'en_haut', 'en_bas', 'au_coin', 'au_dessus', 'autour', 'a_l_interieur', 'a_l_exterieur', 'au_dessous'];
+
+/** Hard's stretch wording: the same places, said the CSEC Form 4-5 way. */
+export const STRETCH_OF: Partial<Record<PrepId, PrepId>> = { dans: 'a_l_interieur', devant: 'a_l_exterieur', sous: 'au_dessous' };
 
 /** Clues about a street thing, which "près de" / "loin de" can narrow down when there are two of it. */
-const NARROWABLE: readonly PrepId[] = ['sous', 'derriere', 'contre', 'a_cote'];
+const NARROWABLE: readonly PrepId[] = ['sous', 'derriere', 'contre', 'a_cote', 'au_dessous'];
 
 /** Pavement spots that are not in front of a place: the gaps between places and the street's end. */
 const onPavement = (spot: Spot): boolean => spot.zone === 'gap' || spot.zone === 'end';
@@ -97,8 +100,10 @@ function holdsAt(clue: Clue, mark: Landmark, spot: Spot, street: Street): boolea
   const mine = spot.of === landmarkId(mark);
   switch (clue.prep) {
     case 'devant':
+    case 'a_l_exterieur':
       return within && mark.kind === 'building' && spot.zone === 'front';
     case 'dans':
+    case 'a_l_interieur':
       return within && mark.kind === 'building' && spot.zone === 'inside';
     case 'sur':
       if (clue.part === 'roof') return within && mark.kind === 'building' && spot.zone === 'roof';
@@ -111,6 +116,7 @@ function holdsAt(clue: Clue, mark: Landmark, spot: Spot, street: Street): boolea
     case 'au_bord':
       return mark.kind === 'prop' && mine && spot.zone === 'edge';
     case 'sous':
+    case 'au_dessous':
       return mark.kind === 'prop' && mine && spot.zone === 'under';
     case 'derriere':
       return mark.kind === 'prop' && mine && spot.zone === 'behind';
@@ -142,6 +148,11 @@ function holdsAt(clue: Clue, mark: Landmark, spot: Spot, street: Street): boolea
     case 'au_coin':
       // The far end of the street is a corner (the signpost stands there).
       return mark.kind === 'street' && spot.zone === 'end';
+    case 'au_dessus':
+      // Upstairs, over the door (the roof is "sur le toit").
+      return within && mark.kind === 'building' && spot.zone === 'upper';
+    case 'autour':
+      return mark.kind === 'prop' && mine && spot.zone === 'around';
     case 'en_haut':
       return mark.kind === 'prop' && mine && spot.zone === 'top';
     case 'en_bas':

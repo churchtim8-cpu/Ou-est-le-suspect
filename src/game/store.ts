@@ -36,7 +36,7 @@ export function saveResult(caseId: string, r: CaseResult): Profile {
 
 export function getLevel(): LevelId {
   const v = new URLSearchParams(window.location.search).get('level') ?? read(LEVEL_KEY);
-  return v === 'medium' ? 'medium' : 'easy';
+  return v === 'medium' || v === 'hard' ? v : 'easy';
 }
 
 export function setLevel(level: LevelId): void {

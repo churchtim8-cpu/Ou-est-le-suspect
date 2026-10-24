@@ -168,6 +168,25 @@ describe('chapter 1 cases', () => {
     expect(matches({ prep: 'au_coin', ref: 'street' }, street).map((x) => x.id)).toEqual(['street.end']);
   });
 
+  it('Hard rewords some clues the stretch way, pointing at the same spots', () => {
+    const seen = new Set<string>();
+    for (const def of CHAPTER_1)
+      for (const seed of seeds.slice(0, 40)) {
+        const plain = planCase(def, street, seed, 5);
+        const hard = planCase(def, street, seed, 5, { stretch: true });
+        hard.suspects.forEach((s, i) => {
+          expect(s.first.target.id).toBe(plain.suspects[i]!.first.target.id);
+          expect(isUnambiguous(s.first.clue, s.first.target, street)).toBe(true);
+          expect(spotsFromSentence(sentenceFr(s.subject, s.first.clue), street).map((x) => x.id)).toEqual([s.first.target.id]);
+          seen.add(s.first.clue.prep);
+        });
+      }
+    for (const p of ['a_l_interieur', 'a_l_exterieur', 'au_dessous']) expect(seen.has(p), p).toBe(true);
+    expect(phraseFr({ prep: 'a_l_interieur', ref: 'museum' })).toBe("à l'intérieur du musée");
+    expect(phraseFr({ prep: 'au_dessus', ref: 'post_office' })).toBe('au-dessus de la poste');
+    expect(phraseFr({ prep: 'autour', ref: 'fountain' })).toBe('autour de la fontaine');
+  });
+
   it('en face de is across the road, devant is this side', () => {
     expect(matches({ prep: 'en_face', ref: 'bank' }, street).map((x) => x.id)).toEqual(['bank.opposite']);
     expect(matches({ prep: 'devant', ref: 'bank' }, street).map((x) => x.id)).toEqual(['bank.front']);
@@ -180,6 +199,7 @@ describe('chapter 1 cases', () => {
     [7, ['pres', 'loin', 'contre']],
     [8, ['au_milieu', 'au_bord', 'au_fond']],
     [9, ['en_haut', 'en_bas', 'au_coin']],
+    [10, ['au_dessus', 'autour']],
   ] as const)('case %i uses each of its new prepositions', (i, want) => {
     const preps = new Set(seeds.flatMap((s) => planCase(CHAPTER_1[i]!, street, s, 5).suspects.flatMap((x) => teaches(x.first.clue))));
     for (const p of want) expect(preps.has(p), p).toBe(true);

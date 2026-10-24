@@ -50,7 +50,7 @@ export class TitleScene extends Phaser.Scene {
     });
     let level = getLevel();
     const levelBtn = button(this, GAME_WIDTH / 2 - 130, 452, 240, 54, `Level: ${LEVELS[level].label}`, () => {
-      level = level === 'easy' ? 'medium' : 'easy';
+      level = level === 'easy' ? 'medium' : level === 'medium' ? 'hard' : 'easy';
       setLevel(level);
       levelBtn.setLabel(`Level: ${LEVELS[level].label}`);
     }, COLOURS.navy, '#ffffff');

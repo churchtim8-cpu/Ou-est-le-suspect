@@ -24,7 +24,9 @@ export type Zone =
   | 'edge' // on the edge of the fountain
   | 'back' // at the back of the square
   | 'top' // at the top of the museum steps
-  | 'bottom'; // at the bottom of the museum steps
+  | 'bottom' // at the bottom of the museum steps
+  | 'upper' // at an upstairs window or balcony, above a place's door
+  | 'around'; // running round the fountain
 
 export interface Landmark {
   /** Tells apart two of the same thing ("bench_2"); defaults to `thing`. */

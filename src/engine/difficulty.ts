@@ -4,7 +4,7 @@
  * once the French is recorded, since they hide the written clue.
  */
 
-export type LevelId = 'easy' | 'medium';
+export type LevelId = 'easy' | 'medium' | 'hard';
 
 export interface Level {
   id: LevelId;
@@ -21,11 +21,14 @@ export interface Level {
   englishHelp: boolean;
   /** Seconds lost for tapping the wrong spot. */
   wrongTapSeconds: number;
+  /** Hard: some clues use the CSEC stretch wording (à l'intérieur de, à l'extérieur de, au-dessous de). */
+  stretch: boolean;
 }
 
 export const LEVELS: Record<LevelId, Level> = {
-  easy: { id: 'easy', label: 'Easy', suspects: 3, secondsPerSuspect: 45, clueSeconds: null, repeats: null, englishHelp: true, wrongTapSeconds: 4 },
-  medium: { id: 'medium', label: 'Medium', suspects: 5, secondsPerSuspect: 36, clueSeconds: 8, repeats: 3, englishHelp: false, wrongTapSeconds: 6 },
+  easy: { id: 'easy', label: 'Easy', suspects: 3, secondsPerSuspect: 45, clueSeconds: null, repeats: null, englishHelp: true, wrongTapSeconds: 4, stretch: false },
+  medium: { id: 'medium', label: 'Medium', suspects: 5, secondsPerSuspect: 36, clueSeconds: 8, repeats: 3, englishHelp: false, wrongTapSeconds: 6, stretch: false },
+  hard: { id: 'hard', label: 'Hard', suspects: 5, secondsPerSuspect: 32, clueSeconds: 6, repeats: 2, englishHelp: false, wrongTapSeconds: 8, stretch: true },
 };
 
 export const SCORING = {
@@ -50,6 +53,11 @@ export const NEAR_FAR = {
   nearPx: 700,
   /** …and the other one is at least this many times further. "Loin de" is the same, the other way round. */
   ratio: 2,
+} as const;
+
+export const STRETCH = {
+  /** On Hard, the share of clues that switch to their stretch wording. */
+  share: 0.5,
 } as const;
 
 export const TWISTS = {
