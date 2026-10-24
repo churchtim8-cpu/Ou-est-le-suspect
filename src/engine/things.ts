@@ -80,6 +80,7 @@ export const PROPS = {
   kiosk: thing('kiosk', 'le kiosque', 'the kiosk', 'm'),
   parasol: thing('parasol', 'le parasol', 'the parasol', 'm'),
   phone_box: thing('phone_box', 'la cabine téléphonique', 'the phone box', 'f'),
+  fountain: thing('fountain', 'la fontaine', 'the fountain', 'f'),
 } as const satisfies Record<string, Thing>;
 
 export type PropKey = keyof typeof PROPS;

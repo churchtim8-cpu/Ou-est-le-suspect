@@ -13,14 +13,16 @@ export type Zone =
   | 'front' // on the pavement in front of a building
   | 'inside' // in a building's doorway
   | 'roof' // on a building's roof
-  | 'open' // out in the open on a square
+  | 'open' // out in the open, in the middle of the square
   | 'under' // under a street thing (tree, bench)
   | 'behind' // hidden behind a street thing (a parked car)
   | 'gap' // on the pavement between two places (in front of a plain shop)
   | 'end' // on the pavement at the end of the street
   | 'beside' // standing right next to a street thing
   | 'against' // leaning on a street thing (a lamp post)
-  | 'opposite'; // on the near pavement, across the road from a place
+  | 'opposite' // on the near pavement, across the road from a place
+  | 'edge' // on the edge of the fountain
+  | 'back'; // at the back of the square
 
 export interface Landmark {
   /** Tells apart two of the same thing ("bench_2"); defaults to `thing`. */

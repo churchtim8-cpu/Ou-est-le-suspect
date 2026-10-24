@@ -88,7 +88,10 @@ describe('chapter 1 cases', () => {
       expect([3, 5]).toContain(firsts.length);
       expect(new Set(firsts.map((t) => t.id)).size).toBe(firsts.length);
       const xs = firsts.map((t) => t.footX);
-      expect(Math.max(...xs) - Math.min(...xs), def.id).toBeGreaterThan(1500);
+      // A case set in the square keeps its new places close; a gang of 5 still spills out along the street.
+      const spread = Math.max(...xs) - Math.min(...xs);
+      if (!def.together) expect(spread, def.id).toBeGreaterThan(1500);
+      else if (firsts.length === 5) expect(spread, def.id).toBeGreaterThan(700);
       const boss = plan.suspects.at(-1)!;
       if (def.boss) {
         expect(boss.boss).toBe(true);
@@ -148,6 +151,15 @@ describe('chapter 1 cases', () => {
     expect(matches({ prep: 'derriere', ref: 'bin', near: { prep: 'pres', ref: 'square' } }, street)).toEqual([]);
   });
 
+  it('the square: three people in it are all "sur la place", so the clue says where in it', () => {
+    expect(matches({ prep: 'sur', ref: 'square' }, street)).toHaveLength(3);
+    expect(matches({ prep: 'au_milieu', ref: 'square' }, street).map((x) => x.id)).toEqual(['square.open']);
+    expect(matches({ prep: 'au_fond', ref: 'square' }, street).map((x) => x.id)).toEqual(['square.back']);
+    expect(matches({ prep: 'au_bord', ref: 'fountain' }, street).map((x) => x.id)).toEqual(['fountain.edge']);
+    expect(phraseFr({ prep: 'au_bord', ref: 'fountain' })).toBe('au bord de la fontaine');
+    expect(phraseFr({ prep: 'au_fond', ref: 'square' })).toBe('au fond de la place');
+  });
+
   it('en face de is across the road, devant is this side', () => {
     expect(matches({ prep: 'en_face', ref: 'bank' }, street).map((x) => x.id)).toEqual(['bank.opposite']);
     expect(matches({ prep: 'devant', ref: 'bank' }, street).map((x) => x.id)).toEqual(['bank.front']);
@@ -158,6 +170,7 @@ describe('chapter 1 cases', () => {
     [5, ['a_gauche', 'a_droite', 'au_bout']],
     [6, ['en_face']],
     [7, ['pres', 'loin', 'contre']],
+    [8, ['au_milieu', 'au_bord', 'au_fond']],
   ] as const)('case %i uses each of its new prepositions', (i, want) => {
     const preps = new Set(seeds.flatMap((s) => planCase(CHAPTER_1[i]!, street, s, 5).suspects.flatMap((x) => teaches(x.first.clue))));
     for (const p of want) expect(preps.has(p), p).toBe(true);

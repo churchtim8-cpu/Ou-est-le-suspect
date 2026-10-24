@@ -58,7 +58,7 @@ export const ORDINALS: readonly Subject[] = [
 ];
 
 /** Prepositions the street model can decide today (chapter 1). */
-export const MODELLED: readonly PrepId[] = ['devant', 'derriere', 'sur', 'sous', 'dans', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin'];
+export const MODELLED: readonly PrepId[] = ['devant', 'derriere', 'sur', 'sous', 'dans', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin', 'au_milieu', 'au_bord', 'au_fond'];
 
 /** Clues about a street thing, which "près de" / "loin de" can narrow down when there are two of it. */
 const NARROWABLE: readonly PrepId[] = ['sous', 'derriere', 'contre', 'a_cote'];
@@ -102,7 +102,14 @@ function holdsAt(clue: Clue, mark: Landmark, spot: Spot, street: Street): boolea
       return within && mark.kind === 'building' && spot.zone === 'inside';
     case 'sur':
       if (clue.part === 'roof') return within && mark.kind === 'building' && spot.zone === 'roof';
+      // Anyone in the square is "sur la place", so with three spots there it no longer picks one.
+      return within && mark.kind === 'square' && (spot.zone === 'open' || spot.zone === 'edge' || spot.zone === 'back');
+    case 'au_milieu':
       return within && mark.kind === 'square' && spot.zone === 'open';
+    case 'au_fond':
+      return within && mark.kind === 'square' && spot.zone === 'back';
+    case 'au_bord':
+      return mark.kind === 'prop' && mine && spot.zone === 'edge';
     case 'sous':
       return mark.kind === 'prop' && mine && spot.zone === 'under';
     case 'derriere':

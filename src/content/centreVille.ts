@@ -84,6 +84,13 @@ const OPPOSITE: Record<string, number> = {
   museum: 6480,
 };
 
+/** The square's picture: the fountain (with its statue) in the middle, cafés at the back. */
+const SQUARE = {
+  fountain: { x0: 2670, x1: 2960, rimY: 382, edgeX: 2700 },
+  backX: 3122,
+  backY: 368,
+};
+
 /** How far from a street thing's edge someone stands "à côté" of it. */
 const BESIDE_GAP = 50;
 
@@ -99,7 +106,12 @@ export function buildCentreVille(): Street {
     if (b.place === 'square') {
       landmarks.push({ thing: 'square', kind: 'square', x0: b.x0, x1: b.x1 });
       const cx = b.x0 + w * 0.5;
-      spots.push({ id: 'square.open', zone: 'open', of: 'square', x: cx - 150, y: 380, w: 300, h: 100, footX: cx, footY: 478 });
+      // In the middle, in front of the fountain; on the fountain's rim; at the back by the cafés.
+      spots.push({ id: 'square.open', zone: 'open', of: 'square', x: cx - 150, y: 396, w: 300, h: 84, footX: cx, footY: 474 });
+      const f = SQUARE.fountain;
+      landmarks.push({ thing: 'fountain', kind: 'prop', x0: f.x0, x1: f.x1 });
+      spots.push({ id: 'fountain.edge', zone: 'edge', of: 'fountain', x: f.edgeX - 45, y: f.rimY - 82, w: 90, h: 86, footX: f.edgeX, footY: f.rimY });
+      spots.push({ id: 'square.back', zone: 'back', of: 'square', x: SQUARE.backX - 40, y: SQUARE.backY - 72, w: 80, h: 76, footX: SQUARE.backX, footY: SQUARE.backY });
       return;
     }
     landmarks.push({ thing: b.place, kind: 'building', x0: b.x0, x1: b.x1 });

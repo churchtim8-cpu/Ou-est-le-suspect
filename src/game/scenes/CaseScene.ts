@@ -26,6 +26,8 @@ const FEEL = {
   suspectHeight: 82,
   /** People on the near pavement look bigger (closer), like the walkers there. */
   nearSuspectHeight: 96,
+  /** Height lost for each pixel further back than the far pavement (the back of the square). */
+  shrinkPerPx: 0.2,
   crouchHeight: 56,
   benchCrouchHeight: 42,
   minimap: { x: 14, y: 676, w: 380 },
@@ -555,6 +557,8 @@ export class CaseScene extends Phaser.Scene {
       // Further down the screen is closer to the player: grow from the far pavement to the near one.
       const t = Phaser.Math.Clamp((spot.footY - (STREET_LINES.base + 22)) / (STREET_LINES.nearPavement[1] - 6 - (STREET_LINES.base + 22)), 0, 1);
       height = Phaser.Math.Linear(FEEL.suspectHeight, FEEL.nearSuspectHeight, t);
+      // Further back than the pavement (deep in the square): smaller.
+      height -= Math.max(0, STREET_LINES.base + 22 - spot.footY) * FEEL.shrinkPerPx;
     }
     if (spot.zone === 'behind' && spot.of.startsWith('bin')) height = FEEL.crouchHeight;
     if (spot.zone === 'under') height = (boss ? 1.15 : 1) * (spot.of.startsWith('bench') ? FEEL.benchCrouchHeight : FEEL.crouchHeight);

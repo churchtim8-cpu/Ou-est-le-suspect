@@ -21,6 +21,8 @@ export interface CaseDef {
   preps: readonly PrepId[];
   /** The chapter's boss case. */
   boss?: 'pie';
+  /** The new places are all in one spot (the square), so the gang may hide close together. */
+  together?: true;
 }
 
 export const CHAPTER_1: readonly CaseDef[] = [
@@ -32,12 +34,13 @@ export const CHAPTER_1: readonly CaseDef[] = [
   { id: 'c1-6', number: 6, title: 'Affaire n°6', blurb: 'Left, right, the very end', preps: ['a_gauche', 'a_droite', 'au_bout'] },
   { id: 'c1-7', number: 7, title: 'Affaire n°7', blurb: 'Across the road', preps: ['en_face'] },
   { id: 'c1-8', number: 8, title: 'Affaire n°8', blurb: 'Near, far, leaning', preps: ['pres', 'loin', 'contre'] },
+  { id: 'c1-9', number: 9, title: 'Affaire n°9', blurb: 'A gang in the square', preps: ['au_milieu', 'au_bord', 'au_fond'], together: true },
   {
-    id: 'c1-9',
-    number: 9,
+    id: 'c1-10',
+    number: 10,
     title: 'La Pie',
     blurb: "BOSS: La Pie's gang",
-    preps: ['devant', 'dans', 'sur', 'sous', 'derriere', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin'],
+    preps: ['devant', 'dans', 'sur', 'sous', 'derriere', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin', 'au_milieu', 'au_bord', 'au_fond'],
     boss: 'pie',
   },
 ];
