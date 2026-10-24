@@ -6,7 +6,7 @@ import { sounds } from '../audio/sounds';
 import { getProfile } from '../store';
 import { button, COLOURS, fullscreenButton, GAME_HEIGHT, GAME_WIDTH, goTo, text } from '../ui';
 
-/** Chapter 1 case board: five case files pinned up, the boss poster last. */
+/** Chapter 1 case board: the case files pinned up, the boss poster last. */
 export class ChapterScene extends Phaser.Scene {
   static readonly KEY = 'chapter';
 
@@ -26,18 +26,21 @@ export class ChapterScene extends Phaser.Scene {
 
     text(this, 60, 30, 'CHAPTER 1', 22, COLOURS.goldText);
     text(this, 60, 56, 'Le centre-ville', 44, '#ffffff');
-    text(this, GAME_WIDTH - 60, 70, 'Find the suspect in 5 cases. Win a case to open the next one.', 20, '#d0d8e8').setOrigin(1, 0.5);
+    text(this, GAME_WIDTH - 60, 70, `Catch the gang in ${CHAPTER_1.length} cases. Win a case to open the next one.`, 20, '#d0d8e8').setOrigin(1, 0.5);
 
     const profile = getProfile();
     const order = CHAPTER_1.map((c) => c.id);
+    // Cards are laid out at 210 wide, then scaled down so the whole chapter fits on the board.
     const cardW = 210;
-    const gap = (GAME_WIDTH - 80 - CHAPTER_1.length * cardW) / (CHAPTER_1.length + 1);
+    const scale = Math.min(1, (GAME_WIDTH - 80 - 16 * (CHAPTER_1.length + 1)) / (CHAPTER_1.length * cardW));
+    const gap = (GAME_WIDTH - 80 - CHAPTER_1.length * cardW * scale) / (CHAPTER_1.length + 1);
     CHAPTER_1.forEach((def, i) => {
-      const x = 40 + gap + i * (cardW + gap) + cardW / 2;
+      const x = 40 + gap + i * (cardW * scale + gap) + (cardW * scale) / 2;
       const y = 370;
       const open = isOpen(profile, order, def.id);
       const best = profile.best[def.id];
-      const card = this.add.container(x, y).setAngle([-3, 2, -1.5, 3, -2][i] ?? 0);
+      // Cards hang straight: Phaser draws text on a tilted card with bits missing.
+      const card = this.add.container(x, y).setScale(scale);
       const g = this.add.graphics();
       g.fillStyle(0x000000, 0.3).fillRoundedRect(-cardW / 2 + 5, -170 + 8, cardW, 340, 10);
       g.fillStyle(def.boss ? 0xfff1c9 : 0xf3e2b8, 1).fillRoundedRect(-cardW / 2, -170, cardW, 340, 10);
@@ -45,26 +48,26 @@ export class ChapterScene extends Phaser.Scene {
       card.add(g);
       if (def.boss) {
         card.add(text(this, 0, -128, 'AVIS DE RECHERCHE', 17, COLOURS.redText).setOrigin(0.5));
-        card.add(this.add.image(0, -20, 'suspect-pie').setDisplaySize(170, 170));
+        card.add(this.add.image(0, -35, 'suspect-pie').setDisplaySize(150, 150));
       } else {
-        card.add(text(this, 0, -128, 'DOSSIER', 17, COLOURS.redText).setOrigin(0.5));
-        card.add(this.add.image(0, -30, 'suspect_4').setDisplaySize(70, 225).setTint(0x14213d).setTintMode(Phaser.TintModes.FILL).setAlpha(0.85));
-        card.add(text(this, 0, -30, '?', 70, '#ffffff', { stroke: COLOURS.navyText, strokeThickness: 8 }).setOrigin(0.5));
+        card.add(text(this, 0, -142, 'DOSSIER', 17, COLOURS.redText).setOrigin(0.5));
+        card.add(this.add.image(0, -36, 'suspect_4').setDisplaySize(56, 180).setTint(0x14213d).setTintMode(Phaser.TintModes.FILL).setAlpha(0.85));
+        card.add(text(this, 0, -36, '?', 60, '#ffffff', { stroke: COLOURS.navyText, strokeThickness: 8 }).setOrigin(0.5));
       }
-      card.add(text(this, 0, 85, def.title, 26, COLOURS.navyText).setOrigin(0.5));
-      card.add(text(this, 0, 117, def.blurb, 15, '#4a3b25', { align: 'center', wordWrap: { width: cardW - 24 } }).setOrigin(0.5, 0));
+      card.add(text(this, 0, 74, def.title, 26, COLOURS.navyText).setOrigin(0.5));
+      card.add(text(this, 0, 96, def.blurb, 16, '#4a3b25', { align: 'center', wordWrap: { width: cardW - 24 } }).setOrigin(0.5, 0));
       if (open) {
-        [0, 1, 2].forEach((n) => card.add(text(this, (n - 1) * 34, 150, '★', 30, (best?.stars ?? 0) > n ? '#e0a000' : '#cdbb94').setOrigin(0.5, 0)));
+        [0, 1, 2].forEach((n) => card.add(text(this, (n - 1) * 34, 128, '★', 30, (best?.stars ?? 0) > n ? '#e0a000' : '#cdbb94').setOrigin(0.5, 0)));
       } else {
-        card.add(text(this, 0, 152, 'LOCKED', 20, '#5a4a35').setOrigin(0.5, 0));
+        card.add(text(this, 0, 134, 'LOCKED', 20, '#5a4a35').setOrigin(0.5, 0));
       }
       if (open) {
         card.setSize(cardW, 340).setInteractive({ useHandCursor: true });
         card.on('pointerover', () => {
           sounds.hover();
-          this.tweens.add({ targets: card, scale: 1.06, angle: 0, duration: 120 });
+          this.tweens.add({ targets: card, scale: scale * 1.06, duration: 120 });
         });
-        card.on('pointerout', () => this.tweens.add({ targets: card, scale: 1, angle: [-3, 2, -1.5, 3, -2][i] ?? 0, duration: 120 }));
+        card.on('pointerout', () => this.tweens.add({ targets: card, scale, duration: 120 }));
         card.on('pointerup', () => {
           sounds.select();
           goTo(this, 'case', { caseId: def.id });

@@ -79,7 +79,10 @@ export const PROPS = {
 
 export type PropKey = keyof typeof PROPS;
 
-export const THINGS: Record<string, Thing> = { ...PLACES, ...PROPS };
+/** The street itself: "au bout de la rue". */
+export const STREET_THING = thing('street', 'la rue', 'the street', 'f');
+
+export const THINGS: Record<string, Thing> = { ...PLACES, ...PROPS, street: STREET_THING };
 
 /** A roof belongs to a building: "le toit de la poste", "le toit du musée". */
 export function roofOf(t: Thing): { word: string; en: string } {

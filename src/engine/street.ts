@@ -15,12 +15,16 @@ export type Zone =
   | 'roof' // on a building's roof
   | 'open' // out in the open on a square
   | 'under' // under a street thing (tree, bench)
-  | 'behind'; // hidden behind a street thing (a parked car)
+  | 'behind' // hidden behind a street thing (a parked car)
+  | 'gap' // on the pavement between two places (in front of a plain shop)
+  | 'end' // on the pavement at the end of the street
+  | 'beside'; // standing right next to a street thing
 
 export interface Landmark {
   /** A key of THINGS. */
   thing: string;
-  kind: 'building' | 'square' | 'prop';
+  /** `street` is the whole street itself ("au bout de la rue"). */
+  kind: 'building' | 'square' | 'prop' | 'street';
   x0: number;
   x1: number;
 }

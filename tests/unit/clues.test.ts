@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildCentreVille } from '../../src/content/centreVille';
 import { CHAPTER_1, planCase } from '../../src/engine/cases';
-import { cluesFor, isUnambiguous, MODELLED, phraseFr, sentenceEn, sentenceFr, SUBJECTS } from '../../src/engine/clues';
+import { cluesFor, isUnambiguous, matches, MODELLED, phraseFr, sentenceEn, sentenceFr, SUBJECTS } from '../../src/engine/clues';
 import { PREPOSITIONS } from '../../src/engine/prepositions';
 import { spotAt } from '../../src/engine/street';
 import { PLACES, PROPS } from '../../src/engine/things';
@@ -30,6 +30,11 @@ describe('French forms', () => {
     expect(phraseFr({ prep: 'sur', ref: 'school', part: 'roof' })).toBe("sur le toit de l'école");
     expect(phraseFr({ prep: 'en_face', ref: 'hotel' })).toBe("en face de l'hôtel");
     expect(sentenceEn(SUBJECTS.suspect, { prep: 'sur', ref: 'square' })).toBe('The suspect is in the square.');
+    expect(phraseFr({ prep: 'entre', ref: 'post_office', ref2: 'town_hall' })).toBe('entre la poste et la mairie');
+    expect(phraseFr({ prep: 'au_bout', ref: 'street' })).toBe('au bout de la rue');
+    expect(phraseFr({ prep: 'a_gauche', ref: 'museum' })).toBe('à gauche du musée');
+    expect(phraseFr({ prep: 'a_droite', ref: 'red_car' })).toBe('à droite de la voiture rouge');
+    expect(sentenceEn(SUBJECTS.suspect, { prep: 'entre', ref: 'bank', ref2: 'library' })).toBe('The suspect is between the bank and the library.');
   });
 
   it('never writes "de le" or "de les"', () => {
@@ -116,6 +121,26 @@ describe('chapter 1 cases', () => {
       const targets = new Set(seeds.map((s) => planCase(def, street, s, 3).suspects[0]!.first.target.id));
       expect(targets.size, def.id).toBeGreaterThan(2);
     }
+  });
+
+  it('entre works either way round, and only for places side by side', () => {
+    const gap = street.spots.find((sp) => sp.id === 'gap.post_office.town_hall')!;
+    expect(isUnambiguous({ prep: 'entre', ref: 'post_office', ref2: 'town_hall' }, gap, street)).toBe(true);
+    expect(isUnambiguous({ prep: 'entre', ref: 'town_hall', ref2: 'post_office' }, gap, street)).toBe(true);
+    expect(cluesFor(gap, street, ['entre']).length).toBe(1);
+    expect(matches({ prep: 'entre', ref: 'police_station', ref2: 'town_hall' }, street)).toEqual([]);
+  });
+
+  it('à côté is only used for street things (a place has two sides)', () => {
+    for (const sp of street.spots) for (const c of cluesFor(sp, street, ['a_cote'])) expect(Object.keys(PROPS)).toContain(c.ref);
+  });
+
+  it.each([
+    [4, ['entre', 'a_cote']],
+    [5, ['a_gauche', 'a_droite', 'au_bout']],
+  ] as const)('case %i uses each of its new prepositions', (i, want) => {
+    const preps = new Set(seeds.flatMap((s) => planCase(CHAPTER_1[i]!, street, s, 5).suspects.map((x) => x.first.clue.prep)));
+    for (const p of want) expect(preps.has(p), p).toBe(true);
   });
 
   it('case 4 uses both sous and derrière', () => {

@@ -17,6 +17,15 @@ export function readClue(sentence: string): Clue | null {
   for (const prep of preps) {
     if (!rest.startsWith(prep.fr + ' ')) continue;
     let obj = rest.slice(prep.fr.length + 1);
+    if (prep.id === 'entre') {
+      // "entre la poste et la mairie": two places, split at the "et" that leaves a known place on each side.
+      for (const { index: i } of obj.matchAll(/ et /g)) {
+        const a = Object.values(THINGS).find((x) => x.word === obj.slice(0, i));
+        const b = Object.values(THINGS).find((x) => x.word === obj.slice(i + 4));
+        if (a && b) return { prep: 'entre', ref: a.key, ref2: b.key };
+      }
+      return null;
+    }
     let part: 'roof' | undefined;
     if (!prep.takesDe && obj.startsWith('le toit ')) {
       part = 'roof';

@@ -5,7 +5,7 @@ import { Rng } from './rng';
 import type { Spot, Street } from './street';
 
 /**
- * Chapter 1 (le centre-ville): one new preposition per case, then the boss
+ * Chapter 1 (le centre-ville): one or more new prepositions per case, then the boss
  * mixes them all with a twist. Each case is a gang (3 suspects on Easy, 5 on
  * Medium) hiding all along the street, found one by one. A case is planned
  * from its seed, so it replays with different hiding spots each time.
@@ -28,7 +28,16 @@ export const CHAPTER_1: readonly CaseDef[] = [
   { id: 'c1-2', number: 2, title: 'Affaire n°2', blurb: 'They slipped inside', preps: ['dans'] },
   { id: 'c1-3', number: 3, title: 'Affaire n°3', blurb: 'Look up high', preps: ['sur'] },
   { id: 'c1-4', number: 4, title: 'Affaire n°4', blurb: 'Hiding low', preps: ['sous', 'derriere'] },
-  { id: 'c1-5', number: 5, title: 'La Pie', blurb: 'BOSS: La Pie and her gang', preps: ['devant', 'dans', 'sur', 'sous', 'derriere'], boss: 'pie' },
+  { id: 'c1-5', number: 5, title: 'Affaire n°5', blurb: 'In between', preps: ['entre', 'a_cote'] },
+  { id: 'c1-6', number: 6, title: 'Affaire n°6', blurb: 'Left, right, the very end', preps: ['a_gauche', 'a_droite', 'au_bout'] },
+  {
+    id: 'c1-7',
+    number: 7,
+    title: 'La Pie',
+    blurb: "BOSS: La Pie's gang",
+    preps: ['devant', 'dans', 'sur', 'sous', 'derriere', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout'],
+    boss: 'pie',
+  },
 ];
 
 export interface PlannedClue {

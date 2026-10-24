@@ -507,7 +507,7 @@ export class CaseScene extends Phaser.Scene {
     sounds.decoy();
     this.time.delayedCall(220, () => sounds.wrong());
     this.cameras.main.shake(140, 0.0035);
-    const building = spot.zone === 'front' || spot.zone === 'inside' || spot.zone === 'roof' || spot.zone === 'open';
+    const building = spot.zone !== 'under' && spot.zone !== 'behind';
     if (building) {
       const who = this.add.image(spot.footX, spot.footY, `walk_${Phaser.Math.Between(0, 7)}`).setOrigin(0.5, 1).setDepth(DEPTH.effects);
       who.setScale(0);
@@ -549,7 +549,7 @@ export class CaseScene extends Phaser.Scene {
     else if (spot.zone === 'roof') key = 'suspect_5';
     else key = 'suspect_4';
     if (spot.zone === 'under') height = (boss ? 1.15 : 1) * (spot.of === 'bench' ? FEEL.benchCrouchHeight : FEEL.crouchHeight);
-    const depth = spot.zone === 'behind' ? DEPTH.suspectBehind : spot.zone === 'under' ? DEPTH.suspectNear : DEPTH.suspectFar;
+    const depth = spot.zone === 'behind' ? DEPTH.suspectBehind : spot.zone === 'under' || spot.zone === 'beside' ? DEPTH.suspectNear : DEPTH.suspectFar;
     const img = this.add.image(spot.footX, spot.footY, key).setOrigin(0.5, 1).setDepth(depth);
     img.setScale(height / img.height);
     return img;
