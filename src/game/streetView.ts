@@ -22,9 +22,6 @@ export const DEPTH = {
   hud: 100,
 } as const;
 
-/** Picture keys for the street things. */
-export const PROP_PICTURE = { tree: 'tree', bench: 'bench', red_car: 'car_0', blue_car: 'car_1' } as const;
-
 interface Car {
   sprite: Phaser.GameObjects.Image;
   speed: number;
@@ -50,10 +47,10 @@ export class StreetView {
     for (let i = 0; i < TILES.count; i++) {
       scene.add.image(i * TILES.width, 0, `street_${i}`).setOrigin(0, 0).setScale(1 / TILES.scale).setDepth(DEPTH.street);
     }
-    for (const [key, p] of Object.entries(PROPS_LAYOUT) as [keyof typeof PROPS_LAYOUT, (typeof PROPS_LAYOUT)[keyof typeof PROPS_LAYOUT]][]) {
-      const img = scene.add.image(p.x, p.footY, PROP_PICTURE[key]).setOrigin(0.5, 1).setDepth(DEPTH.props);
+    for (const p of PROPS_LAYOUT) {
+      const img = scene.add.image(p.x, p.footY, p.picture).setOrigin(0.5, 1).setDepth(DEPTH.props);
       img.setScale(p.height / img.height);
-      if (key === 'blue_car') img.setFlipX(true);
+      if (p.flip) img.setFlipX(true);
     }
     this.addLife();
   }

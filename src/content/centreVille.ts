@@ -21,24 +21,71 @@ export const STREET_LINES = {
 /** Roof lines measured by eye where the automatic one caught a tower behind or a pediment's tip. */
 const ROOF_FIX: Record<string, number> = { bank: 214, museum: 206 };
 
-/** Street things, placed in front of the plain shops so they never hide a place's door. */
-export const PROPS_LAYOUT = {
-  tree: { x: 1609, footY: 712, height: 236 },
-  bench: { x: 4129, footY: 690, height: 64 },
-  red_car: { x: 900, footY: STREET_LINES.parkedY, height: 92 },
-  blue_car: { x: 4990, footY: STREET_LINES.parkedY, height: 92 },
-} as const;
+/** What can happen at a street thing; each becomes a hiding spot. */
+interface PropZones {
+  under?: true;
+  behind?: true;
+  /** Standing right next to it, on this side. */
+  beside?: 'left' | 'right';
+  /** Leaning on it (a lamp post). */
+  against?: true;
+}
 
-/** Display widths of the street things (from their pictures' shapes, at the heights above). */
-const PROP_WIDTH = { tree: 159, bench: 108, red_car: 137, blue_car: 194 } as const;
+export interface PropPlacement {
+  /** Unique in the street: "bench_2". */
+  id: string;
+  /** A key of THINGS, or null for decoration nobody hides by. */
+  thing: string | null;
+  /** Picture key. */
+  picture: string;
+  x: number;
+  footY: number;
+  /** Display height and width (width from the picture's shape at that height). */
+  height: number;
+  width: number;
+  flip?: boolean;
+  zones: PropZones;
+}
 
-/** How far right of a street thing's edge someone stands "à côté" of it, and where their feet go. */
-const BESIDE = {
-  tree: { gap: 45, footY: 712 },
-  bench: { gap: 40, footY: 692 },
-  red_car: { gap: 40, footY: STREET_LINES.parkedY - 2 },
-  blue_car: { gap: 40, footY: STREET_LINES.parkedY - 2 },
-} as const;
+const NEAR = 706;
+
+/**
+ * Street things. The far pavement keeps the places' doors clear; the near
+ * pavement (in front of the road) has the street furniture: two of some
+ * things (benches, bins, lamp posts) so that "près de" / "loin de" are needed
+ * to say which one.
+ */
+export const PROPS_LAYOUT: readonly PropPlacement[] = [
+  { id: 'bench_2', thing: 'bench', picture: 'bench', x: 500, footY: 692, height: 64, width: 108, zones: { under: true, beside: 'right' } },
+  { id: 'red_car', thing: 'red_car', picture: 'car_0', x: 900, footY: STREET_LINES.parkedY, height: 92, width: 137, zones: { behind: true, beside: 'right' } },
+  { id: 'bin_1', thing: 'bin', picture: 'bin', x: 1250, footY: NEAR, height: 58, width: 43, zones: { behind: true } },
+  { id: 'tree', thing: 'tree', picture: 'tree', x: 1609, footY: 712, height: 236, width: 159, zones: { under: true, beside: 'right' } },
+  { id: 'lamp_1', thing: 'lamp', picture: 'lamp', x: 2050, footY: NEAR, height: 200, width: 34, zones: { against: true } },
+  { id: 'parasol', thing: 'parasol', picture: 'parasol', x: 2800, footY: NEAR, height: 125, width: 98, zones: { under: true } },
+  { id: 'flower_stall', thing: null, picture: 'flower_stall', x: 3080, footY: NEAR, height: 105, width: 84, zones: {} },
+  { id: 'kiosk', thing: 'kiosk', picture: 'kiosk', x: 3740, footY: NEAR, height: 150, width: 92, zones: { behind: true, beside: 'right' } },
+  { id: 'bench', thing: 'bench', picture: 'bench', x: 4129, footY: 690, height: 64, width: 108, zones: { under: true, beside: 'right' } },
+  { id: 'lamp_2', thing: 'lamp', picture: 'lamp', x: 4450, footY: NEAR, height: 200, width: 34, zones: { against: true } },
+  { id: 'bin_2', thing: 'bin', picture: 'bin', x: 4800, footY: NEAR, height: 58, width: 43, zones: { behind: true } },
+  { id: 'blue_car', thing: 'blue_car', picture: 'car_1', x: 4990, footY: STREET_LINES.parkedY, height: 92, width: 194, flip: true, zones: { behind: true, beside: 'right' } },
+  { id: 'bus_stop', thing: 'bus_stop', picture: 'bus_shelter', x: 5450, footY: NEAR, height: 140, width: 165, zones: { behind: true, beside: 'right' } },
+  { id: 'phone_box', thing: 'phone_box', picture: 'phone_box', x: 6250, footY: NEAR, height: 150, width: 65, zones: { behind: true, beside: 'right' } },
+];
+
+/** Where someone stands on the near pavement "en face de" each place (clear of the street things). */
+const OPPOSITE: Record<string, number> = {
+  police_station: 300,
+  post_office: 1420,
+  town_hall: 2250,
+  square: 2560,
+  bank: 3560,
+  library: 4630,
+  school: 5200,
+  museum: 6480,
+};
+
+/** How far from a street thing's edge someone stands "à côté" of it. */
+const BESIDE_GAP = 50;
 
 /** Narrower gaps than this between two places are left as plain wall (no hiding spot). */
 const MIN_GAP = 120;
@@ -77,19 +124,31 @@ export function buildCentreVille(): Street {
   const last = row.at(-1)!;
   if (layout.width - last.x1 >= MIN_GAP) pavement('street.end', 'end', (last.x1 + layout.width) / 2);
   landmarks.push({ thing: 'street', kind: 'street', x0: 0, x1: layout.width });
-  for (const [key, p] of Object.entries(PROPS_LAYOUT) as [keyof typeof PROPS_LAYOUT, (typeof PROPS_LAYOUT)[keyof typeof PROPS_LAYOUT]][]) {
-    const w = PROP_WIDTH[key];
-    landmarks.push({ thing: key, kind: 'prop', x0: p.x - w / 2, x1: p.x + w / 2 });
-    if (key === 'tree') {
-      spots.push({ id: 'tree.under', zone: 'under', of: key, x: p.x - 80, y: p.footY - 150, w: 160, h: 150, footX: p.x + 34, footY: p.footY - 2 });
-    } else if (key === 'bench') {
-      spots.push({ id: 'bench.under', zone: 'under', of: key, x: p.x - 58, y: p.footY - 64, w: 116, h: 64, footX: p.x, footY: p.footY - 2 });
-    } else {
-      spots.push({ id: `${key}.behind`, zone: 'behind', of: key, x: p.x - w / 2, y: p.footY - p.height, w, h: p.height, footX: p.x + w * 0.25, footY: p.footY - 14 });
+  for (const [place, x] of Object.entries(OPPOSITE)) {
+    spots.push({ id: `${place}.opposite`, zone: 'opposite', of: place, x: x - 50, y: NEAR - 110, w: 100, h: 110, footX: x, footY: NEAR - 2 });
+  }
+  for (const p of PROPS_LAYOUT) {
+    if (!p.thing) continue;
+    const w = p.width;
+    landmarks.push({ id: p.id, thing: p.thing, kind: 'prop', x0: p.x - w / 2, x1: p.x + w / 2 });
+    const z = p.zones;
+    if (z.under) {
+      if (p.thing === 'tree') spots.push({ id: `${p.id}.under`, zone: 'under', of: p.id, x: p.x - 80, y: p.footY - 150, w: 160, h: 150, footX: p.x + 34, footY: p.footY - 2 });
+      else spots.push({ id: `${p.id}.under`, zone: 'under', of: p.id, x: p.x - Math.max(50, w / 2 + 4), y: p.footY - Math.min(110, p.height), w: Math.max(100, w + 8), h: Math.min(110, p.height), footX: p.x + (p.thing === 'parasol' ? 10 : 0), footY: p.footY - 2 });
     }
-    const side = BESIDE[key];
-    const bx = p.x + w / 2 + side.gap + 10;
-    spots.push({ id: `${key}.beside`, zone: 'beside', of: key, x: bx - 50, y: side.footY - 110, w: 100, h: 110, footX: bx, footY: side.footY });
+    if (z.behind) {
+      // Low things (cars, bins): the head shows over the top. Tall ones (a kiosk): half the body peeks out at the side.
+      const tall = p.height > 120;
+      spots.push({ id: `${p.id}.behind`, zone: 'behind', of: p.id, x: p.x - w / 2, y: p.footY - p.height, w: Math.max(w, 60), h: p.height, footX: tall ? p.x + w / 2 - 6 : p.x + w * 0.25, footY: p.footY - (p.thing === 'bin' ? 6 : 14) });
+    }
+    if (z.against) {
+      spots.push({ id: `${p.id}.against`, zone: 'against', of: p.id, x: p.x - 70, y: p.footY - 110, w: 90, h: 110, footX: p.x - 20, footY: p.footY - 2 });
+    }
+    if (z.beside) {
+      const bx = z.beside === 'right' ? p.x + w / 2 + BESIDE_GAP : p.x - w / 2 - BESIDE_GAP;
+      const footY = p.footY - 2;
+      spots.push({ id: `${p.id}.beside`, zone: 'beside', of: p.id, x: bx - 50, y: footY - 110, w: 100, h: 110, footX: bx, footY });
+    }
   }
   return { id: 'centre-ville', name: 'Le centre-ville', width: layout.width, landmarks, spots };
 }

@@ -45,6 +45,13 @@ export const GANG = {
   spreadPx: 700,
 } as const;
 
+export const NEAR_FAR = {
+  /** "Près de la poste": the thing is at most this far from the place (world px, centre to centre)… */
+  nearPx: 700,
+  /** …and the other one is at least this many times further. "Loin de" is the same, the other way round. */
+  ratio: 2,
+} as const;
+
 export const TWISTS = {
   /** "Attention, elle bouge !": the boss moves this many seconds after the clue (or at her first near miss). */
   moveAfterSeconds: 14,

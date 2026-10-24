@@ -18,9 +18,13 @@ export type Zone =
   | 'behind' // hidden behind a street thing (a parked car)
   | 'gap' // on the pavement between two places (in front of a plain shop)
   | 'end' // on the pavement at the end of the street
-  | 'beside'; // standing right next to a street thing
+  | 'beside' // standing right next to a street thing
+  | 'against' // leaning on a street thing (a lamp post)
+  | 'opposite'; // on the near pavement, across the road from a place
 
 export interface Landmark {
+  /** Tells apart two of the same thing ("bench_2"); defaults to `thing`. */
+  id?: string;
   /** A key of THINGS. */
   thing: string;
   /** `street` is the whole street itself ("au bout de la rue"). */
@@ -32,7 +36,7 @@ export interface Landmark {
 export interface Spot {
   id: string;
   zone: Zone;
-  /** The landmark this spot was laid out from (its key). */
+  /** The landmark this spot was laid out from (its id, or its thing). */
   of: string;
   /** Tap area. */
   x: number;
@@ -52,6 +56,8 @@ export interface Street {
   landmarks: Landmark[];
   spots: Spot[];
 }
+
+export const landmarkId = (l: Landmark): string => l.id ?? l.thing;
 
 export const centreX = (s: Spot): number => s.x + s.w / 2;
 export const centreY = (s: Spot): number => s.y + s.h / 2;

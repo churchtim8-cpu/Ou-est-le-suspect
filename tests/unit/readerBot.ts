@@ -11,7 +11,22 @@ import { holds, type Clue } from '../../src/engine/clues';
 export function readClue(sentence: string): Clue | null {
   const m = /^(?:Le suspect|Le (?:premier|deuxième|troisième|quatrième|cinquième) suspect|Il|La Pie|Elle) est (.+)\.$/.exec(sentence);
   if (!m || !m[1]) return null;
-  const rest = m[1];
+  let rest = m[1];
+  // "sous le banc près de la poste": a place at the end says which of two.
+  let near: Clue['near'];
+  for (const q of [PREPOSITIONS.pres, PREPOSITIONS.loin]) {
+    const at = rest.lastIndexOf(` ${q.fr} `);
+    if (at <= 0) continue;
+    const place = Object.values(THINGS).find((x) => x.de === rest.slice(at + q.fr.length + 2));
+    if (!place) continue;
+    near = { prep: q.id as 'pres' | 'loin', ref: place.key };
+    rest = rest.slice(0, at);
+  }
+  const base = readPlain(rest);
+  return base && near ? { ...base, near } : base;
+}
+
+function readPlain(rest: string): Clue | null {
   // Longest preposition first ("à côté" before "à").
   const preps = Object.values(PREPOSITIONS).sort((a, b) => b.fr.length - a.fr.length);
   for (const prep of preps) {

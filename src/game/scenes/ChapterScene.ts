@@ -30,13 +30,18 @@ export class ChapterScene extends Phaser.Scene {
 
     const profile = getProfile();
     const order = CHAPTER_1.map((c) => c.id);
-    // Cards are laid out at 210 wide, then scaled down so the whole chapter fits on the board.
+    // Cards are laid out at 210 x 340, then scaled to fit the board: one row, or two when there are many.
     const cardW = 210;
-    const scale = Math.min(1, (GAME_WIDTH - 80 - 16 * (CHAPTER_1.length + 1)) / (CHAPTER_1.length * cardW));
-    const gap = (GAME_WIDTH - 80 - CHAPTER_1.length * cardW * scale) / (CHAPTER_1.length + 1);
+    const cardH = 340;
+    const rows = CHAPTER_1.length > 7 ? 2 : 1;
+    const perRow = Math.ceil(CHAPTER_1.length / rows);
+    const scale = Math.min(1, (GAME_WIDTH - 80 - 16 * (perRow + 1)) / (perRow * cardW), (500 - 16 * (rows + 1)) / (rows * cardH));
     CHAPTER_1.forEach((def, i) => {
-      const x = 40 + gap + i * (cardW * scale + gap) + (cardW * scale) / 2;
-      const y = 370;
+      const row = Math.floor(i / perRow);
+      const inRow = row === rows - 1 ? CHAPTER_1.length - perRow * row : perRow;
+      const gap = (GAME_WIDTH - 80 - inRow * cardW * scale) / (inRow + 1);
+      const x = 40 + gap + (i - row * perRow) * (cardW * scale + gap) + (cardW * scale) / 2;
+      const y = 370 + (row - (rows - 1) / 2) * (cardH * scale + 14);
       const open = isOpen(profile, order, def.id);
       const best = profile.best[def.id];
       // Cards hang straight: Phaser draws text on a tilted card with bits missing.

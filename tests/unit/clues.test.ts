@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildCentreVille } from '../../src/content/centreVille';
 import { CHAPTER_1, planCase } from '../../src/engine/cases';
-import { cluesFor, isUnambiguous, matches, MODELLED, phraseFr, sentenceEn, sentenceFr, SUBJECTS } from '../../src/engine/clues';
+import { cluesFor, isUnambiguous, matches, MODELLED, QUALIFIERS, teaches, phraseFr, sentenceEn, sentenceFr, SUBJECTS } from '../../src/engine/clues';
 import { PREPOSITIONS } from '../../src/engine/prepositions';
 import { spotAt } from '../../src/engine/street';
 import { PLACES, PROPS } from '../../src/engine/things';
@@ -78,7 +78,7 @@ describe('chapter 1 cases', () => {
         for (const step of [s.first, s.move]) {
           if (!step) continue;
           expect(isUnambiguous(step.clue, step.target, street)).toBe(true);
-          expect(MODELLED).toContain(step.clue.prep);
+          for (const p of teaches(step.clue)) expect(MODELLED).toContain(p);
         }
   });
 
@@ -100,8 +100,9 @@ describe('chapter 1 cases', () => {
   it('the new preposition comes first: review only fills a gang the new one cannot', () => {
     for (const def of CHAPTER_1.filter((d) => !d.boss))
       for (const plan of plans(def)) {
-        const own = plan.suspects.filter((s) => def.preps.includes(s.first.clue.prep)).length;
-        const room = new Set(street.spots.filter((sp) => cluesFor(sp, street, def.preps).length > 0).map((sp) => sp.id)).size;
+        const own = plan.suspects.filter((s) => teaches(s.first.clue).some((p) => def.preps.includes(p))).length;
+        const quals = QUALIFIERS.filter((q) => def.preps.includes(q) || CHAPTER_1.some((c) => c.number < def.number && c.preps.includes(q)));
+        const room = new Set(street.spots.filter((sp) => cluesFor(sp, street, def.preps, quals).length > 0).map((sp) => sp.id)).size;
         expect(own, def.id).toBe(Math.min(plan.suspects.length, room));
       }
   });
@@ -132,14 +133,33 @@ describe('chapter 1 cases', () => {
   });
 
   it('à côté is only used for street things (a place has two sides)', () => {
-    for (const sp of street.spots) for (const c of cluesFor(sp, street, ['a_cote'])) expect(Object.keys(PROPS)).toContain(c.ref);
+    for (const sp of street.spots) for (const c of cluesFor(sp, street, ['a_cote'], ['pres', 'loin'])) expect(street.landmarks.find((l) => l.thing === c.ref)?.kind).toBe('prop');
+  });
+
+  it('près de / loin de pick one of two look-alikes, and only then', () => {
+    const near = { prep: 'sous', ref: 'bench', near: { prep: 'pres', ref: 'police_station' } } as const;
+    expect(matches(near, street).map((x) => x.id)).toEqual(['bench_2.under']);
+    expect(matches({ ...near, near: { prep: 'loin', ref: 'police_station' } }, street).map((x) => x.id)).toEqual(['bench.under']);
+    expect(phraseFr(near)).toBe('sous le banc près du commissariat de police');
+    expect(sentenceEn(SUBJECTS.suspect, near)).toBe('The suspect is under the bench near the police station.');
+    // The kiosk is one of a kind: "près de" would be padding.
+    expect(matches({ prep: 'derriere', ref: 'kiosk', near: { prep: 'pres', ref: 'bank' } }, street)).toEqual([]);
+    // Halfway between the two bins, neither is clearly nearer.
+    expect(matches({ prep: 'derriere', ref: 'bin', near: { prep: 'pres', ref: 'square' } }, street)).toEqual([]);
+  });
+
+  it('en face de is across the road, devant is this side', () => {
+    expect(matches({ prep: 'en_face', ref: 'bank' }, street).map((x) => x.id)).toEqual(['bank.opposite']);
+    expect(matches({ prep: 'devant', ref: 'bank' }, street).map((x) => x.id)).toEqual(['bank.front']);
   });
 
   it.each([
     [4, ['entre', 'a_cote']],
     [5, ['a_gauche', 'a_droite', 'au_bout']],
+    [6, ['en_face']],
+    [7, ['pres', 'loin', 'contre']],
   ] as const)('case %i uses each of its new prepositions', (i, want) => {
-    const preps = new Set(seeds.flatMap((s) => planCase(CHAPTER_1[i]!, street, s, 5).suspects.map((x) => x.first.clue.prep)));
+    const preps = new Set(seeds.flatMap((s) => planCase(CHAPTER_1[i]!, street, s, 5).suspects.flatMap((x) => teaches(x.first.clue))));
     for (const p of want) expect(preps.has(p), p).toBe(true);
   });
 

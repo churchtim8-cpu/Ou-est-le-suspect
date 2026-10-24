@@ -1,5 +1,5 @@
 import { GANG } from './difficulty';
-import { cluesFor, ORDINALS, SUBJECTS, type Clue, type Subject } from './clues';
+import { cluesFor, ORDINALS, QUALIFIERS, SUBJECTS, type Clue, type Qualifier, type Subject } from './clues';
 import type { PrepId } from './prepositions';
 import { Rng } from './rng';
 import type { Spot, Street } from './street';
@@ -30,12 +30,14 @@ export const CHAPTER_1: readonly CaseDef[] = [
   { id: 'c1-4', number: 4, title: 'Affaire n°4', blurb: 'Hiding low', preps: ['sous', 'derriere'] },
   { id: 'c1-5', number: 5, title: 'Affaire n°5', blurb: 'In between', preps: ['entre', 'a_cote'] },
   { id: 'c1-6', number: 6, title: 'Affaire n°6', blurb: 'Left, right, the very end', preps: ['a_gauche', 'a_droite', 'au_bout'] },
+  { id: 'c1-7', number: 7, title: 'Affaire n°7', blurb: 'Across the road', preps: ['en_face'] },
+  { id: 'c1-8', number: 8, title: 'Affaire n°8', blurb: 'Near, far, leaning', preps: ['pres', 'loin', 'contre'] },
   {
-    id: 'c1-7',
-    number: 7,
+    id: 'c1-9',
+    number: 9,
     title: 'La Pie',
     blurb: "BOSS: La Pie's gang",
-    preps: ['devant', 'dans', 'sur', 'sous', 'derriere', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout'],
+    preps: ['devant', 'dans', 'sur', 'sous', 'derriere', 'entre', 'a_cote', 'a_gauche', 'a_droite', 'au_bout', 'en_face', 'contre', 'pres', 'loin'],
     boss: 'pie',
   },
 ];
@@ -77,8 +79,21 @@ function shuffle<T>(rng: Rng, list: readonly T[]): T[] {
   return out;
 }
 
-function plannable(street: Street, preps: readonly PrepId[]): PlannedClue[] {
-  return street.spots.flatMap((target) => cluesFor(target, street, preps).map((clue) => ({ target, clue })));
+const plannableCache = new WeakMap<Street, Map<string, PlannedClue[]>>();
+
+function plannable(street: Street, preps: readonly PrepId[], quals: readonly Qualifier[] = []): PlannedClue[] {
+  let cache = plannableCache.get(street);
+  if (!cache) plannableCache.set(street, (cache = new Map()));
+  const key = `${preps.join(',')}|${quals.join(',')}`;
+  let list = cache.get(key);
+  if (!list) cache.set(key, (list = street.spots.flatMap((target) => cluesFor(target, street, preps, quals).map((clue) => ({ target, clue })))));
+  return list;
+}
+
+/** "Près de" / "loin de" may narrow other clues once they are taught (in this case or before). */
+function qualifiersFor(def: CaseDef): Qualifier[] {
+  const known = new Set([...def.preps, ...earlier(def)]);
+  return QUALIFIERS.filter((q) => known.has(q));
 }
 
 /** Prepositions taught in the cases before this one (review for a big gang). */
@@ -93,8 +108,9 @@ function earlier(def: CaseDef): PrepId[] {
  * fill in.
  */
 function chooseGang(rng: Rng, street: Street, def: CaseDef, count: number, taken: Spot[] = []): PlannedClue[] {
-  const own = def.preps.map((prep) => shuffle(rng.fork(`own-${prep}`), plannable(street, [prep])));
-  const review = shuffle(rng.fork('review'), plannable(street, earlier(def)));
+  const quals = qualifiersFor(def);
+  const own = def.preps.map((prep) => shuffle(rng.fork(`own-${prep}`), plannable(street, [prep], quals)));
+  const review = shuffle(rng.fork('review'), plannable(street, earlier(def), quals));
   const chosen: PlannedClue[] = [];
   const used = new Set(taken.map((s) => s.id));
   const far = (c: PlannedClue, gap: number) => [...taken, ...chosen.map((x) => x.target)].every((s) => Math.abs(s.footX - c.target.footX) >= gap);
@@ -137,7 +153,7 @@ export function planCase(def: CaseDef, street: Street, seed: string, count: numb
     const apart = (gap: number) => roofs.filter((p) => taken.every((t) => Math.abs(t.footX - p.target.footX) >= gap));
     const spread = [GANG.spreadPx, GANG.spreadPx / 2, 0].map(apart).find((l) => l.length > 0)!;
     const first = pick(rng.fork('first'), spread);
-    const away = plannable(street, def.preps).filter((p) => p.target !== first.target && !taken.includes(p.target) && Math.abs(p.target.footX - first.target.footX) > 900);
+    const away = plannable(street, def.preps, qualifiersFor(def)).filter((p) => p.target !== first.target && !taken.includes(p.target) && Math.abs(p.target.footX - first.target.footX) > 900);
     const move = pick(rng.fork('move'), away);
     return {
       def,

@@ -24,6 +24,8 @@ const FEEL = {
   dragThreshold: 12,
   typeMs: 34,
   suspectHeight: 82,
+  /** People on the near pavement look bigger (closer), like the walkers there. */
+  nearSuspectHeight: 96,
   crouchHeight: 56,
   benchCrouchHeight: 42,
   minimap: { x: 14, y: 676, w: 380 },
@@ -545,11 +547,19 @@ export class CaseScene extends Phaser.Scene {
     let height: number = FEEL.suspectHeight;
     if (boss) key = spot.zone === 'roof' ? 'pie_ring' : 'pie_stand';
     else if (spot.zone === 'under') key = 'suspect_2';
+    else if (spot.zone === 'behind' && spot.of.startsWith('bin')) key = 'suspect_2';
     else if (spot.zone === 'behind' || spot.zone === 'inside') key = 'suspect_3';
     else if (spot.zone === 'roof') key = 'suspect_5';
     else key = 'suspect_4';
-    if (spot.zone === 'under') height = (boss ? 1.15 : 1) * (spot.of === 'bench' ? FEEL.benchCrouchHeight : FEEL.crouchHeight);
-    const depth = spot.zone === 'behind' ? DEPTH.suspectBehind : spot.zone === 'under' || spot.zone === 'beside' ? DEPTH.suspectNear : DEPTH.suspectFar;
+    if (spot.zone !== 'roof') {
+      // Further down the screen is closer to the player: grow from the far pavement to the near one.
+      const t = Phaser.Math.Clamp((spot.footY - (STREET_LINES.base + 22)) / (STREET_LINES.nearPavement[1] - 6 - (STREET_LINES.base + 22)), 0, 1);
+      height = Phaser.Math.Linear(FEEL.suspectHeight, FEEL.nearSuspectHeight, t);
+    }
+    if (spot.zone === 'behind' && spot.of.startsWith('bin')) height = FEEL.crouchHeight;
+    if (spot.zone === 'under') height = (boss ? 1.15 : 1) * (spot.of.startsWith('bench') ? FEEL.benchCrouchHeight : FEEL.crouchHeight);
+    const near = spot.zone === 'under' || spot.zone === 'beside' || spot.zone === 'against' || spot.zone === 'opposite';
+    const depth = spot.zone === 'behind' ? DEPTH.suspectBehind : near ? DEPTH.suspectNear : DEPTH.suspectFar;
     const img = this.add.image(spot.footX, spot.footY, key).setOrigin(0.5, 1).setDepth(depth);
     img.setScale(height / img.height);
     return img;
